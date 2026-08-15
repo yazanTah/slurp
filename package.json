@@ -1,0 +1,16 @@
+{
+  "name": "tiktok-clean-downloader",
+  "version": "1.0.0",
+  "description": "Unique minimalist TikTok video & slideshow zip downloader",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

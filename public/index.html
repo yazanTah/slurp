@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070708">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SLURP</title>
+  <meta name="description" content="Paste TikTok link. Slurp video or slideshow. Nothing else.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="glow-point"></div>
+
+  <main class="canvas">
+    <!-- Monolithic Wordmark -->
+    <header class="monolith-head">
+      <h1 class="logo" id="logoTitle">SLURP</h1>
+      <p class="micro-status" id="statusLine">paste link → get mp4 or zip</p>
+    </header>
+
+    <!-- The 1 Thing Input -->
+    <section class="machine-zone">
+      <form id="slurpForm" class="slurp-bar" autocomplete="off">
+        <input 
+          type="text" 
+          id="urlInput" 
+          placeholder="tiktok url..." 
+          spellcheck="false" 
+          autocomplete="off" 
+          autofocus 
+          required 
+        />
+        <button type="submit" id="goBtn" aria-label="Slurp">
+          <span id="btnArrow">↓</span>
+        </button>
+      </form>
+
+      <!-- Feedback / Result Surface -->
+      <div id="slurpOutput" class="output-surface" style="display: none;">
+        <div class="pulse-bar" id="pulseBar"></div>
+        <div class="output-content" id="outputContent">
+          <!-- Dynamically injected minimal status or download trigger -->
+        </div>
+      </div>
+
+      <!-- Hint -->
+      <div class="sub-hint">
+        <span>⌘V / Ctrl+V anywhere</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
