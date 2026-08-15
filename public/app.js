@@ -151,13 +151,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getDownloadUrl(data) {
+    if (!data.videoUrl) return '';
+    // For TikTok, route through /api/stream/video
+    if (data.platform === 'tiktok') {
+      return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}`;
+    }
+    // For YouTube, FB, Twitter, Instagram: direct CDN link bypasses server proxy blocks
+    return data.videoUrl;
+  }
+
   function renderOutput(data) {
     outputSection.style.display = 'block';
     const isVideo = data.type === 'video';
     const title = data.title || 'Media';
     const filename = `${sanitize(title)}.mp4`;
     const platform = (data.platform || 'media').toUpperCase();
-    const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(title))}`;
+    const downloadUrl = getDownloadUrl(data);
 
     let previewHtml = '';
     let downloadHtml = '';
@@ -169,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       downloadHtml = `
-        <a href="${streamUrl}" class="btn-slurp-download" download="${filename}">
+        <a href="${downloadUrl}" class="btn-slurp-download" download="${filename}" target="_blank" rel="noopener noreferrer">
           ↓ DOWNLOAD .MP4 [${platform}]
         </a>
       `;
@@ -228,11 +238,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function triggerInstantDownload(data) {
     if (data.type === 'video' && data.videoUrl) {
       const filename = `${sanitize(data.title)}.mp4`;
-      const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}`;
+      const downloadUrl = getDownloadUrl(data);
       
       const a = document.createElement('a');
-      a.href = streamUrl;
+      a.href = downloadUrl;
       a.setAttribute('download', filename);
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       setTimeout(() => document.body.removeChild(a), 1000);

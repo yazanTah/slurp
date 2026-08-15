@@ -6,7 +6,6 @@ const http = require('http');
 const axios = require('axios');
 const archiver = require('archiver');
 const btch = require('btch-downloader');
-const ytdl = require('@distube/ytdl-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 // High-performance Keep-Alive Connection Pool for Massive Parallelism
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
-const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 12000 });
+const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 15000 });
 
 app.use(cors());
 app.use(express.json());
@@ -168,35 +167,9 @@ async function resolveInstagram(targetUrl) {
   throw new Error('Unable to extract Instagram link. Make sure the post is public.');
 }
 
-// 3. YouTube & Shorts Fast-Racing Resolver
+// 3. YouTube & Shorts Resolver
 async function resolveYouTube(targetUrl) {
-  // Strategy A: Direct @distube/ytdl-core stream extraction
-  const ytdlStrategy = (async () => {
-    const info = await ytdl.getInfo(targetUrl);
-    const formats = ytdl.filterFormats(info.formats, 'audioandvideo');
-    const bestFormat = formats.find(f => f.qualityLabel === '720p') || formats[0];
-    if (bestFormat && bestFormat.url) {
-      return {
-        success: true,
-        platform: 'youtube',
-        id: info.videoDetails?.videoId || String(Date.now()),
-        title: info.videoDetails?.title || 'YouTube Video',
-        author: {
-          name: info.videoDetails?.author?.name || 'YouTube Creator',
-          username: info.videoDetails?.author?.user || 'user',
-          avatar: info.videoDetails?.author?.thumbnails?.[0]?.url || ''
-        },
-        cover: info.videoDetails?.thumbnails?.[0]?.url || '',
-        type: 'video',
-        videoUrl: bestFormat.url,
-        images: []
-      };
-    }
-    throw new Error('ytdl format error');
-  })();
-
-  // Strategy B: btch.youtube proxy fallback
-  const btchStrategy = (async () => {
+  try {
     const yt = await btch.youtube(targetUrl);
     if (yt && yt.status && yt.mp4) {
       return {
@@ -204,74 +177,41 @@ async function resolveYouTube(targetUrl) {
         platform: 'youtube',
         id: String(Date.now()),
         title: yt.title || 'YouTube Video',
-        author: { name: yt.author || 'YouTube Channel', username: yt.author || 'creator', avatar: '' },
+        author: {
+          name: yt.author || 'YouTube Channel',
+          username: yt.author || 'creator',
+          avatar: yt.thumbnail || ''
+        },
         cover: yt.thumbnail || '',
         type: 'video',
         videoUrl: yt.mp4,
+        audioUrl: yt.mp3 || '',
         images: []
       };
     }
-    throw new Error('btch failed');
-  })();
+  } catch (e) {}
 
-  try {
-    return await Promise.any([ytdlStrategy, btchStrategy]);
-  } catch (e) {
-    throw new Error('Unable to extract YouTube video. Make sure video is public.');
-  }
+  throw new Error('Unable to extract YouTube video. Make sure the video is public.');
 }
 
-// 4. Facebook Reels & Watch Fast-Racing Resolver
+// 4. Facebook Reels & Watch Resolver
 async function resolveFacebook(targetUrl) {
-  // Strategy A: btch.fbdown (RapidCDN stream extraction)
-  const btchFbPromise = (async () => {
+  try {
     const fb = await btch.fbdown(targetUrl);
     if (fb && fb.status && (fb.HD || fb.Normal_video)) {
       return {
         success: true,
         platform: 'facebook',
         id: String(Date.now()),
-        title: 'Facebook Reel',
+        title: 'Facebook Video',
         type: 'video',
         videoUrl: fb.HD || fb.Normal_video,
         images: []
       };
     }
-    throw new Error('fbdown failed');
-  })();
+  } catch (e) {}
 
-  // Strategy B: Direct SSR HTML regex extraction
-  const regexFbPromise = (async () => {
-    const fbPage = await fastAxios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      },
-      timeout: 6000
-    });
-    const html = fbPage.data;
-    const hdMatch = html.match(/"browser_native_hd_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/);
-    const sdMatch = html.match(/"browser_native_sd_url":"([^"]+)"/) || html.match(/"playable_url":"([^"]+)"/);
-    const videoRaw = hdMatch ? hdMatch[1] : (sdMatch ? sdMatch[1] : null);
-    if (videoRaw) {
-      return {
-        success: true,
-        platform: 'facebook',
-        id: String(Date.now()),
-        title: 'Facebook Video',
-        type: 'video',
-        videoUrl: JSON.parse(`"${videoRaw}"`),
-        images: []
-      };
-    }
-    throw new Error('regex failed');
-  })();
-
-  try {
-    return await Promise.any([btchFbPromise, regexFbPromise]);
-  } catch (e) {
-    throw new Error('Unable to extract Facebook video. Make sure post is public.');
-  }
+  throw new Error('Unable to extract Facebook video. Make sure post is public.');
 }
 
 // 5. Twitter / X Fast Resolver
@@ -395,7 +335,9 @@ app.get('/api/stream/video', async (req, res) => {
       url: targetUrl,
       responseType: 'stream',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Referer': targetUrl.includes('tikwm') ? 'https://www.tikwm.com/' : undefined
       },
       timeout: 40000,
     });
