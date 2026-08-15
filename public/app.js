@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Blazing Fast Parallel Race Resolver
   async function resolveTikTok(rawUrl) {
-    const params = new URLSearchParams({ url: rawUrl, hd: '1' }).toString();
+    const params = new URLSearchParams({ url: rawUrl }).toString();
 
     // Fast-race multiple client endpoints simultaneously: first response wins!
     const clientPromiseA = fetch('https://www.tikwm.com/api/', {

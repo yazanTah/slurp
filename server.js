@@ -56,14 +56,14 @@ async function fetchTikTokData(rawInput) {
     throw new Error('Please enter a valid TikTok link.');
   }
 
-  const endpointA = fastAxios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl, hd: '1' }).toString(), {
+  const endpointA = fastAxios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl }).toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     }
   }).then(r => r.data);
 
-  const endpointB = fastAxios.post('https://tikwm.com/api/', new URLSearchParams({ url: targetUrl, hd: '1' }).toString(), {
+  const endpointB = fastAxios.post('https://tikwm.com/api/', new URLSearchParams({ url: targetUrl }).toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
