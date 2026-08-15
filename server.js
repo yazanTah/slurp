@@ -54,42 +54,57 @@ function cleanTikTokUrl(input) {
   return urlMatch[0].replace(/[)>,;]+$/, '');
 }
 
-// Fetch TikTok data using TikWM API
+// Fetch TikTok data with multiple cloud-safe strategies
 async function fetchTikTokData(rawInput) {
   const targetUrl = cleanTikTokUrl(rawInput);
   if (!targetUrl) {
     throw new Error('Please enter a valid TikTok link.');
   }
 
-  const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+  const strategies = [
+    // Strategy 1: TikWM POST with mobile app headers (Bypasses Cloudflare 403 on cloud hosts)
+    async () => {
+      const params = new URLSearchParams({ url: targetUrl, hd: '1' });
+      const res = await axios.post('https://www.tikwm.com/api/', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'User-Agent': 'com.ss.android.ugc.trill/260103 (Linux; U; Android 12; en_US; Pixel 6; Build/SQ3A.220705.004; Cronet/58.0.2991.0)',
+          'Accept': 'application/json, text/plain, */*',
+        },
+        timeout: 10000,
+      });
+      return res.data;
+    },
+    // Strategy 2: TikWM GET Query
+    async () => {
+      const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+        },
+        timeout: 10000,
+      });
+      return res.data;
+    },
+    // Strategy 3: Mirror endpoint
+    async () => {
+      const params = new URLSearchParams({ url: targetUrl, count: '12', cursor: '0', web: '1', hd: '1' });
+      const res = await axios.post('https://api.tikwm.com/api/', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15',
+        },
+        timeout: 10000,
+      });
+      return res.data;
+    }
   ];
 
   let lastError = null;
 
-  for (const ua of userAgents) {
+  for (const strategy of strategies) {
     try {
-      const params = new URLSearchParams({
-        url: targetUrl,
-        count: '12',
-        cursor: '0',
-        web: '1',
-        hd: '1'
-      });
-
-      const response = await axios.post('https://www.tikwm.com/api/', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'User-Agent': ua,
-          'Accept': 'application/json, text/javascript, */*; q=0.01',
-          'Origin': 'https://www.tikwm.com',
-          'Referer': 'https://www.tikwm.com/'
-        },
-        timeout: 15000,
-      });
-
-      const data = response.data;
+      const data = await strategy();
       if (data && data.code === 0 && data.data) {
         const d = data.data;
         const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
@@ -123,7 +138,7 @@ async function fetchTikTokData(rawInput) {
           },
         };
 
-        // Cache for clean direct download endpoints
+        // Cache for direct downloads
         mediaCache.set(mediaId, {
           ...payload,
           timestamp: Date.now()
@@ -131,17 +146,17 @@ async function fetchTikTokData(rawInput) {
 
         return payload;
       } else {
-        lastError = data?.msg || 'Could not parse TikTok link. Please ensure post is public.';
+        lastError = data?.msg || 'Post not found or private.';
       }
     } catch (err) {
       lastError = err.message || 'Connection error.';
     }
   }
 
-  throw new Error(lastError || 'Unable to resolve TikTok. Please try again.');
+  throw new Error(lastError || 'Unable to resolve TikTok. Make sure post is public.');
 }
 
-// Helper: Bundle images and optional audio into a streaming zip
+// Helper: Bundle images and audio into a streaming zip
 async function streamZipArchive(res, images, title, musicUrl) {
   const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
 
@@ -159,7 +174,6 @@ async function streamZipArchive(res, images, title, musicUrl) {
 
   archive.pipe(res);
 
-  // Fetch images concurrently
   const fetchPromises = images.map(async (imgUrl, index) => {
     try {
       const padNum = String(index + 1).padStart(2, '0');
@@ -176,7 +190,6 @@ async function streamZipArchive(res, images, title, musicUrl) {
     }
   });
 
-  // Fetch optional audio
   let musicPromise = Promise.resolve();
   if (musicUrl) {
     const formattedMusic = formatMediaUrl(musicUrl);
@@ -285,7 +298,9 @@ const externalUrl = process.env.RENDER_EXTERNAL_URL;
 if (externalUrl) {
   const pingInterval = 12 * 60 * 1000; // 12 minutes
   setInterval(() => {
-    axios.get(`${externalUrl}/api/ping`)
+    axios.get(`${externalUrl}/api/ping`, {
+      headers: { 'User-Agent': 'SLURP-KeepAlive/1.0' }
+    })
       .then(() => console.log('🔄 Render Keep-Alive ping sent.'))
       .catch((e) => console.warn('Keep-alive ping failed:', e.message));
   }, pingInterval);
