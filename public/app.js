@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLURP // ZERO-LATENCY INSTANT STREAMING CONTROLLER
+   SLURP // FAIL-PROOF HIGH-SPEED STREAMING CONTROLLER
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handleSlurp();
   });
 
-  // Instant Auto-Slurp on Global Paste
+  // Global Paste Handler (Cmd+V / Ctrl+V anywhere)
   window.addEventListener('paste', (e) => {
     if (document.activeElement !== input) {
       const text = e.clipboardData?.getData('text');
@@ -31,12 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Auto-Slurp on input paste
-  input.addEventListener('paste', (e) => {
+  input.addEventListener('paste', () => {
     setTimeout(() => {
       if (/tiktok\.com/i.test(input.value)) {
         handleSlurp();
       }
-    }, 10);
+    }, 20);
   });
 
   // Escape key to reset
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await resolveTikTok(rawUrl);
 
-      // Trigger instant streaming download immediately!
+      // Trigger direct streaming download immediately!
       triggerInstantDownload(data);
 
       setLoading(false);
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isVideo = data.type === 'video';
     const title = data.title || 'TikTok Media';
     const filename = `${sanitize(title)}.mp4`;
-    const directStreamUrl = `/api/download/${data.id}/video?url=${encodeURIComponent(input.value.trim())}`;
+    const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(title))}`;
 
     let previewHtml = '';
     let downloadHtml = '';
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       downloadHtml = `
-        <a href="${directStreamUrl}" class="btn-slurp-download" download="${filename}">
+        <a href="${streamUrl}" class="btn-slurp-download" download="${filename}">
           ↓ DOWNLOAD .MP4 [NO WATERMARK]
         </a>
       `;
@@ -228,24 +228,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('outputResetBtn')?.addEventListener('click', resetUI);
   }
 
-  // Instant Zero-Delay Direct Streaming Trigger (Opens in 0.01s)
+  // Instant Streaming Download Trigger
   function triggerInstantDownload(data) {
     if (data.type === 'video') {
       const filename = `${sanitize(data.title)}.mp4`;
-      const directStreamUrl = `/api/download/${data.id}/video?url=${encodeURIComponent(input.value.trim())}`;
+      const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}`;
       
       const a = document.createElement('a');
-      a.href = directStreamUrl;
+      a.href = streamUrl;
       a.setAttribute('download', filename);
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => document.body.removeChild(a), 500);
+      setTimeout(() => document.body.removeChild(a), 1000);
     } else {
       downloadZip(data);
     }
   }
 
-  // Ultra-Fast Slideshow Zip Download
+  // Fast Slideshow Zip Download
   async function downloadZip(data) {
     const btn = document.getElementById('zipDownloadBtn');
     if (btn) btn.textContent = 'PACKAGING ZIP...';

@@ -9,10 +9,10 @@ const archiver = require('archiver');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// High-speed Keep-Alive Socket Agents
+// High-performance Keep-Alive Connection Pool
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 });
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 });
-const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 10000 });
+const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 15000 });
 
 app.use(cors());
 app.use(express.json());
@@ -20,19 +20,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1d',
   etag: true
 }));
-
-// In-memory cache for resolved media (auto-cleans after 30 mins)
-const mediaCache = new Map();
-
-function cleanOldCache() {
-  const now = Date.now();
-  for (const [id, item] of mediaCache.entries()) {
-    if (now - item.timestamp > 30 * 60 * 1000) {
-      mediaCache.delete(id);
-    }
-  }
-}
-setInterval(cleanOldCache, 5 * 60 * 1000);
 
 // Ensure relative media URLs have full domain prefix
 function formatMediaUrl(rawPath) {
@@ -97,7 +84,7 @@ async function fetchTikTokData(rawInput) {
       const rawVideo = isSlideshow ? null : (d.play || d.hdplay || d.wmplay);
       const rawHdVideo = d.hdplay || d.play;
 
-      const payload = {
+      return {
         success: true,
         id: mediaId,
         title: d.title || 'tiktok_media',
@@ -121,13 +108,6 @@ async function fetchTikTokData(rawInput) {
           views: d.play_count || 0,
         },
       };
-
-      mediaCache.set(mediaId, {
-        ...payload,
-        timestamp: Date.now()
-      });
-
-      return payload;
     }
   } catch (err) {
     try {
@@ -139,7 +119,7 @@ async function fetchTikTokData(rawInput) {
         const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
         const mediaId = String(d.id || Date.now());
 
-        const payload = {
+        return {
           success: true,
           id: mediaId,
           title: d.title || 'tiktok_media',
@@ -149,8 +129,6 @@ async function fetchTikTokData(rawInput) {
           images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
           music: formatMediaUrl(d.music)
         };
-        mediaCache.set(mediaId, { ...payload, timestamp: Date.now() });
-        return payload;
       }
     } catch (e) {}
   }
@@ -158,14 +136,54 @@ async function fetchTikTokData(rawInput) {
   throw new Error('Unable to resolve TikTok. Make sure post is public.');
 }
 
-// Ultra-fast In-Memory ZIP Archiver (Level 0/1 compression for instant packaging)
-async function streamZipArchive(res, images, title, musicUrl) {
+// Direct Instant Video Streamer (No cache dependencies, 100% reliable)
+app.get('/api/stream/video', async (req, res) => {
+  const { url, title } = req.query;
+  if (!url) {
+    return res.status(400).send('Missing video URL.');
+  }
+
+  const safeFilename = `${sanitizeFilename(title, 'tiktok_video')}.mp4`;
+  const targetUrl = formatMediaUrl(url);
+
+  try {
+    const videoResponse = await axios({
+      method: 'GET',
+      url: targetUrl,
+      responseType: 'stream',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      timeout: 40000,
+    });
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    if (videoResponse.headers['content-length']) {
+      res.setHeader('Content-Length', videoResponse.headers['content-length']);
+    }
+
+    videoResponse.data.pipe(res);
+  } catch (err) {
+    console.error('Video stream error:', err.message);
+    if (!res.headersSent) {
+      res.status(500).send('Failed to stream video.');
+    }
+  }
+});
+
+// Fast In-Memory ZIP Archiver (Level 1 compression)
+app.post('/api/stream/slideshow-zip', async (req, res) => {
+  const { images, title, musicUrl } = req.body;
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return res.status(400).send('No images provided for slideshow.');
+  }
+
   const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
 
-  // Level 1 = instant packaging (0 delay)
   const archive = archiver('zip', { zlib: { level: 1 } });
 
   archive.on('error', (err) => {
@@ -175,7 +193,6 @@ async function streamZipArchive(res, images, title, musicUrl) {
 
   archive.pipe(res);
 
-  // Parallel bulk image download through connection pool
   const fetchPromises = images.map(async (imgUrl, index) => {
     try {
       const padNum = String(index + 1).padStart(2, '0');
@@ -209,7 +226,7 @@ async function streamZipArchive(res, images, title, musicUrl) {
   } catch (err) {
     archive.abort();
   }
-}
+});
 
 // API: Resolve endpoint
 app.post('/api/resolve', async (req, res) => {
@@ -224,71 +241,6 @@ app.post('/api/resolve', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: err.message || 'Failed to process TikTok link.' });
   }
-});
-
-// Direct Pipe Video Download with Zero Buffer Delay: /api/download/:id/video
-app.get('/api/download/:id/video', async (req, res) => {
-  const { id } = req.params;
-  let item = mediaCache.get(id);
-
-  // If not cached, resolve on the fly if target url is passed in query
-  if (!item && req.query.url) {
-    try {
-      item = await fetchTikTokData(req.query.url);
-    } catch (e) {}
-  }
-
-  if (!item || !item.videoUrl) {
-    return res.status(404).send('Download session expired. Please paste link again.');
-  }
-
-  const safeFilename = `${sanitizeFilename(item.title, 'tiktok_video')}.mp4`;
-
-  try {
-    const videoResponse = await axios({
-      method: 'GET',
-      url: item.videoUrl,
-      responseType: 'stream',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      decompress: false, // Don't waste CPU decompressing, pipe raw bytes directly
-      timeout: 30000,
-    });
-
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
-    if (videoResponse.headers['content-length']) {
-      res.setHeader('Content-Length', videoResponse.headers['content-length']);
-    }
-
-    // Direct pipe straight to the client socket without buffering in RAM
-    videoResponse.data.pipe(res);
-  } catch (err) {
-    if (!res.headersSent) res.status(500).send('Failed to stream video.');
-  }
-});
-
-// Clean Direct Slideshow ZIP Download by ID: /api/download/:id/slideshow.zip
-app.get('/api/download/:id/slideshow.zip', async (req, res) => {
-  const { id } = req.params;
-  const item = mediaCache.get(id);
-
-  if (!item || !item.images || item.images.length === 0) {
-    return res.status(404).send('Download session expired or slideshow not found. Please paste link again.');
-  }
-
-  await streamZipArchive(res, item.images, item.title, item.music);
-});
-
-// Direct Slideshow ZIP Streaming by POST
-app.post('/api/stream/slideshow-zip', async (req, res) => {
-  const { images, title, musicUrl } = req.body;
-  if (!images || !Array.isArray(images) || images.length === 0) {
-    return res.status(400).send('No images provided for slideshow.');
-  }
-
-  await streamZipArchive(res, images, title, musicUrl);
 });
 
 // Health check endpoint
