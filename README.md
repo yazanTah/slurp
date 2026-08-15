@@ -6,6 +6,7 @@
 ---
 
 ## 📑 Table of Contents
+- [About](#-about)
 - [Overview](#-overview)
 - [Key Features](#-key-features)
 - [AI & Agent Integration](#-ai--agent-integration)
@@ -20,6 +21,18 @@
 - [Deployment & Custom Domains](#-deployment--custom-domains)
 - [UX & Keyboard Shortcuts](#-ux--keyboard-shortcuts)
 - [Disclaimer & License](#-disclaimer--license)
+
+---
+
+## ⟁ About
+
+**SLURP** was created to kill the clutter of modern media downloaders. 
+
+Most download websites are packed with intrusive banner ads, deceptive "Download" buttons, forced 15-second wait times, and bloated trackings. **SLURP** is the pure anti-bloat alternative built on a single manifesto:
+
+> **Do 1 thing flawlessly: paste a TikTok link $\rightarrow$ get your clean `.mp4` video or full-res `.zip` photo carousel. Zero ads. Zero watermarks. Nothing more, nothing less.**
+
+Read the full design philosophy in **[ABOUT.md](ABOUT.md)**.
 
 ---
 
