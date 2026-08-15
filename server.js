@@ -6,6 +6,7 @@ const http = require('http');
 const axios = require('axios');
 const archiver = require('archiver');
 const btch = require('btch-downloader');
+const ytdl = require('@distube/ytdl-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,19 +22,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1d',
   etag: true
 }));
-
-// In-memory cache for resolved media (auto-cleans after 30 mins)
-const mediaCache = new Map();
-
-function cleanOldCache() {
-  const now = Date.now();
-  for (const [id, item] of mediaCache.entries()) {
-    if (now - item.timestamp > 30 * 60 * 1000) {
-      mediaCache.delete(id);
-    }
-  }
-}
-setInterval(cleanOldCache, 5 * 60 * 1000);
 
 // Ensure relative media URLs have full domain prefix
 function formatMediaUrl(rawPath) {
@@ -74,7 +62,7 @@ function cleanMediaUrl(input) {
   return match[0].replace(/[)>,;]+$/, '');
 }
 
-// --- RESOLVERS ---
+// --- FAST RESOLVERS ---
 
 // 1. TikTok Fast Resolver
 async function resolveTikTok(targetUrl) {
@@ -144,14 +132,13 @@ async function resolveTikTok(targetUrl) {
   throw new Error('Could not resolve TikTok media.');
 }
 
-// 2. Instagram Resolver (Reels & Carousels)
+// 2. Instagram Fast Resolver (Reels & Carousels)
 async function resolveInstagram(targetUrl) {
   try {
     const igData = await btch.igdl(targetUrl);
     if (igData && igData.status && Array.isArray(igData.result) && igData.result.length > 0) {
       const validItems = igData.result.filter(item => item.url);
       if (validItems.length > 1) {
-        // Multi-image Carousel Slideshow
         return {
           success: true,
           platform: 'instagram',
@@ -181,9 +168,35 @@ async function resolveInstagram(targetUrl) {
   throw new Error('Unable to extract Instagram link. Make sure the post is public.');
 }
 
-// 3. YouTube & Shorts Resolver
+// 3. YouTube & Shorts Fast-Racing Resolver
 async function resolveYouTube(targetUrl) {
-  try {
+  // Strategy A: Direct @distube/ytdl-core stream extraction
+  const ytdlStrategy = (async () => {
+    const info = await ytdl.getInfo(targetUrl);
+    const formats = ytdl.filterFormats(info.formats, 'audioandvideo');
+    const bestFormat = formats.find(f => f.qualityLabel === '720p') || formats[0];
+    if (bestFormat && bestFormat.url) {
+      return {
+        success: true,
+        platform: 'youtube',
+        id: info.videoDetails?.videoId || String(Date.now()),
+        title: info.videoDetails?.title || 'YouTube Video',
+        author: {
+          name: info.videoDetails?.author?.name || 'YouTube Creator',
+          username: info.videoDetails?.author?.user || 'user',
+          avatar: info.videoDetails?.author?.thumbnails?.[0]?.url || ''
+        },
+        cover: info.videoDetails?.thumbnails?.[0]?.url || '',
+        type: 'video',
+        videoUrl: bestFormat.url,
+        images: []
+      };
+    }
+    throw new Error('ytdl format error');
+  })();
+
+  // Strategy B: btch.youtube proxy fallback
+  const btchStrategy = (async () => {
     const yt = await btch.youtube(targetUrl);
     if (yt && yt.status && yt.mp4) {
       return {
@@ -195,67 +208,73 @@ async function resolveYouTube(targetUrl) {
         cover: yt.thumbnail || '',
         type: 'video',
         videoUrl: yt.mp4,
-        music: yt.mp3,
-        musicTitle: 'Audio Track',
         images: []
       };
     }
-  } catch (e) {}
+    throw new Error('btch failed');
+  })();
 
-  throw new Error('Unable to extract YouTube video. Make sure the video is public.');
+  try {
+    return await Promise.any([ytdlStrategy, btchStrategy]);
+  } catch (e) {
+    throw new Error('Unable to extract YouTube video. Make sure video is public.');
+  }
 }
 
-// 4. Facebook Resolver (Reels & Watch)
+// 4. Facebook Reels & Watch Fast-Racing Resolver
 async function resolveFacebook(targetUrl) {
-  // Strategy A: Direct High-Speed Regex Scraper
-  try {
-    const fbPage = await fastAxios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9'
-      },
-      timeout: 8000
-    });
-    const html = fbPage.data;
-    const hdMatch = html.match(/"browser_native_hd_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/);
-    const sdMatch = html.match(/"browser_native_sd_url":"([^"]+)"/) || html.match(/"playable_url":"([^"]+)"/);
-    const videoRaw = hdMatch ? hdMatch[1] : (sdMatch ? sdMatch[1] : null);
-
-    if (videoRaw) {
-      const cleanVideoUrl = JSON.parse(`"${videoRaw}"`);
-      return {
-        success: true,
-        platform: 'facebook',
-        id: String(Date.now()),
-        title: 'Facebook Video',
-        type: 'video',
-        videoUrl: cleanVideoUrl,
-        images: []
-      };
-    }
-  } catch (e) {}
-
-  // Strategy B: btch.fbdown
-  try {
+  // Strategy A: btch.fbdown (RapidCDN stream extraction)
+  const btchFbPromise = (async () => {
     const fb = await btch.fbdown(targetUrl);
     if (fb && fb.status && (fb.HD || fb.Normal_video)) {
       return {
         success: true,
         platform: 'facebook',
         id: String(Date.now()),
-        title: 'Facebook Video',
+        title: 'Facebook Reel',
         type: 'video',
         videoUrl: fb.HD || fb.Normal_video,
         images: []
       };
     }
-  } catch (e) {}
+    throw new Error('fbdown failed');
+  })();
 
-  throw new Error('Unable to extract Facebook video. Make sure post is public.');
+  // Strategy B: Direct SSR HTML regex extraction
+  const regexFbPromise = (async () => {
+    const fbPage = await fastAxios.get(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      },
+      timeout: 6000
+    });
+    const html = fbPage.data;
+    const hdMatch = html.match(/"browser_native_hd_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/);
+    const sdMatch = html.match(/"browser_native_sd_url":"([^"]+)"/) || html.match(/"playable_url":"([^"]+)"/);
+    const videoRaw = hdMatch ? hdMatch[1] : (sdMatch ? sdMatch[1] : null);
+    if (videoRaw) {
+      return {
+        success: true,
+        platform: 'facebook',
+        id: String(Date.now()),
+        title: 'Facebook Video',
+        type: 'video',
+        videoUrl: JSON.parse(`"${videoRaw}"`),
+        images: []
+      };
+    }
+    throw new Error('regex failed');
+  })();
+
+  try {
+    return await Promise.any([btchFbPromise, regexFbPromise]);
+  } catch (e) {
+    throw new Error('Unable to extract Facebook video. Make sure post is public.');
+  }
 }
 
-// 5. Twitter / X Resolver
+// 5. Twitter / X Fast Resolver
 async function resolveTwitter(targetUrl) {
   try {
     const tw = await btch.twitter(targetUrl);
@@ -300,7 +319,6 @@ async function resolveUniversalMedia(rawInput) {
     case 'twitter':
       return await resolveTwitter(targetUrl);
     default:
-      // Try TikTok first, then YouTube, then Facebook as universal fallbacks
       try { return await resolveTikTok(targetUrl); } catch (e) {}
       try { return await resolveYouTube(targetUrl); } catch (e) {}
       try { return await resolveFacebook(targetUrl); } catch (e) {}
@@ -315,7 +333,6 @@ async function streamZipArchive(res, images, title, musicUrl) {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
 
-  // store: true (Level 0) = Instant uncompressed bundling
   const archive = archiver('zip', { store: true });
 
   archive.on('error', (err) => {
@@ -325,7 +342,6 @@ async function streamZipArchive(res, images, title, musicUrl) {
 
   archive.pipe(res);
 
-  // Parallel concurrent image fetching through high-speed Keep-Alive pool
   const fetchPromises = images.map(async (imgUrl, index) => {
     try {
       const padNum = String(index + 1).padStart(2, '0');
