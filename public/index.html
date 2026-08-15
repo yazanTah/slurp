@@ -9,6 +9,9 @@
   <title>SLURP</title>
   <meta name="description" content="Paste TikTok link. Slurp video or slideshow. Nothing else.">
   
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  
   <!-- DNS Prefetch & Preconnect for Insane Speed -->
   <link rel="preconnect" href="https://www.tikwm.com" crossorigin>
   <link rel="dns-prefetch" href="https://www.tikwm.com">
@@ -26,7 +29,12 @@
   <main class="canvas">
     <!-- Monolithic Wordmark -->
     <header class="monolith-head">
-      <h1 class="logo" id="logoTitle">SLURP</h1>
+      <div class="logo-wrap">
+        <svg class="header-icon" viewBox="0 0 32 32" width="32" height="32" fill="none">
+          <path d="M16 4 L16 22 M8 14 L16 24 L24 14 M6 28 L26 28" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1 class="logo" id="logoTitle">SLURP</h1>
+      </div>
       <p class="micro-status" id="statusLine">paste link → get mp4 or zip</p>
     </header>
 

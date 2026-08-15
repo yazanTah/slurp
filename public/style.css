@@ -80,6 +80,25 @@ body {
   align-items: center;
 }
 
+.logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 14px);
+}
+
+.header-icon {
+  color: var(--accent);
+  width: clamp(28px, 7vw, 48px);
+  height: clamp(28px, 7vw, 48px);
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.logo-wrap:hover .header-icon {
+  transform: translateY(2px) scale(1.1);
+}
+
 .logo {
   font-family: var(--font-display);
   font-size: clamp(42px, 12vw, 76px);
@@ -94,7 +113,7 @@ body {
   display: block;
 }
 
-.logo:hover {
+.logo-wrap:hover .logo {
   color: var(--accent);
   letter-spacing: -0.02em;
 }
