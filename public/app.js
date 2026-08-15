@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLURP // CLIENT CONTROLLER (HYBRID CLIENT-RESILIENT RESOLVER)
+   SLURP // HYPER-OPTIMIZED ZERO-LATENCY CLIENT CONTROLLER
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handleSlurp();
   });
 
-  // Global Paste Handler (Cmd+V / Ctrl+V anywhere)
+  // Instant Auto-Slurp on Global Paste
   window.addEventListener('paste', (e) => {
     if (document.activeElement !== input) {
       const text = e.clipboardData?.getData('text');
@@ -28,6 +28,15 @@ document.addEventListener('DOMContentLoaded', () => {
         handleSlurp();
       }
     }
+  });
+
+  // Auto-Slurp on input paste event
+  input.addEventListener('paste', (e) => {
+    setTimeout(() => {
+      if (/tiktok\.com/i.test(input.value)) {
+        handleSlurp();
+      }
+    }, 10);
   });
 
   // Escape key to reset
@@ -42,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
   }
 
-  // Normalize TikWM payload into SLURP schema
+  // Normalize payload
   function normalizeTikwmData(d) {
     const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
     const rawVideo = isSlideshow ? null : (d.play || d.hdplay || d.wmplay);
@@ -74,38 +83,51 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Hybrid Resolver (Tries direct client fetch from user IP first, then server fallback)
+  // Blazing Fast Parallel Race Resolver
   async function resolveTikTok(rawUrl) {
-    // 1. Direct Client-Side Fetch (Bypasses all cloud host datacenter IP blocks!)
-    try {
-      const params = new URLSearchParams({ url: rawUrl, hd: '1' });
-      const clientRes = await fetch('https://www.tikwm.com/api/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: params.toString()
-      });
-      if (clientRes.ok) {
-        const clientData = await clientRes.json();
-        if (clientData && clientData.code === 0 && clientData.data) {
-          return normalizeTikwmData(clientData.data);
-        }
-      }
-    } catch (err) {
-      console.warn('Direct client resolve fallback to server:', err);
-    }
+    const params = new URLSearchParams({ url: rawUrl, hd: '1' }).toString();
 
-    // 2. Server API Fallback
-    const serverRes = await fetch('/api/resolve', {
+    // Fast-race multiple client endpoints simultaneously: first response wins!
+    const clientPromiseA = fetch('https://www.tikwm.com/api/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: params
+    }).then(r => r.json()).then(d => {
+      if (d && d.code === 0 && d.data) return normalizeTikwmData(d.data);
+      throw new Error('A failed');
+    });
+
+    const clientPromiseB = fetch('https://tikwm.com/api/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: params
+    }).then(r => r.json()).then(d => {
+      if (d && d.code === 0 && d.data) return normalizeTikwmData(d.data);
+      throw new Error('B failed');
+    });
+
+    const serverFallback = fetch('/api/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: rawUrl }),
+    }).then(r => r.json()).then(d => {
+      if (d && d.success) return d;
+      throw new Error('Server fallback failed');
     });
 
-    const serverData = await serverRes.json();
-    if (!serverRes.ok || !serverData.success) {
-      throw new Error(serverData.error || 'Failed to extract TikTok media.');
+    try {
+      return await Promise.any([clientPromiseA, clientPromiseB, serverFallback]);
+    } catch (e) {
+      // Last-ditch direct attempt
+      const lastRes = await fetch('/api/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: rawUrl }),
+      });
+      const data = await lastRes.json();
+      if (!lastRes.ok || !data.success) throw new Error(data.error || 'Failed to extract TikTok media.');
+      return data;
     }
-    return serverData;
   }
 
   async function handleSlurp() {
@@ -121,10 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await resolveTikTok(rawUrl);
 
+      // Instant Download Trigger immediately before DOM updates
+      triggerAutoDownload(data);
+
       setLoading(false);
       statusLine.textContent = data.type === 'video' ? 'video slurped' : `slideshow slurped (${data.images.length} photos)`;
       renderOutput(data);
-      triggerAutoDownload(data);
 
     } catch (err) {
       setLoading(false);
@@ -137,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     outputSection.style.display = 'block';
     const isVideo = data.type === 'video';
     const title = data.title || 'TikTok Media';
-    const filename = sanitize(title);
 
     let previewHtml = '';
     let downloadHtml = '';
@@ -154,8 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       `;
     } else {
-      // Slideshow
-      const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" />`).join('');
+      const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" loading="lazy" />`).join('');
       previewHtml = `
         <div class="slideshow-mini-reel">
           ${thumbs}
@@ -218,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Direct High-Speed Video Download (Blob stream fallback)
+  // Direct High-Speed Video Download (Instant Direct Blob / Anchor Stream)
   async function downloadDirectVideo(data) {
     const filename = `${sanitize(data.title)}.mp4`;
     const btn = document.getElementById('videoDownloadBtn');
@@ -240,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (btn) btn.textContent = '↓ DOWNLOAD .MP4 [NO WATERMARK]';
     } catch (e) {
-      // Fallback to direct URL anchor click
       const a = document.createElement('a');
       a.href = data.videoUrl;
       a.target = '_blank';
@@ -252,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Slideshow Zip Archiver Download
+  // Ultra-Fast Slideshow Zip Download
   async function downloadZip(data) {
     const btn = document.getElementById('zipDownloadBtn');
     if (btn) btn.textContent = 'PACKAGING ZIP...';
