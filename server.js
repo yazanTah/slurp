@@ -9,15 +9,15 @@ const archiver = require('archiver');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// High-performance Keep-Alive Connection Pool
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, maxFreeSockets: 20 });
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100, maxFreeSockets: 20 });
+// High-speed Keep-Alive Socket Agents
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 });
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 });
 const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 10000 });
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
-  maxAge: '1d', // Cache static assets for maximum speed
+  maxAge: '1d',
   etag: true
 }));
 
@@ -37,9 +37,7 @@ setInterval(cleanOldCache, 5 * 60 * 1000);
 // Ensure relative media URLs have full domain prefix
 function formatMediaUrl(rawPath) {
   if (!rawPath || typeof rawPath !== 'string') return null;
-  if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
-    return rawPath;
-  }
+  if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) return rawPath;
   return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
 }
 
@@ -48,10 +46,10 @@ function sanitizeFilename(name, fallback = 'tiktok_media') {
   if (!name) return fallback;
   const clean = name
     .replace(/[^\x20-\x7E]/g, '') // ASCII only
-    .replace(/[<>:"/\\|?*#%&=;+`~[\]$@!]/g, '') // Remove forbidden chars
+    .replace(/[<>:"/\\|?*#%&=;+`~[\]$@!]/g, '')
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
-    .slice(0, 40)
+    .slice(0, 35)
     .trim();
   return clean || fallback;
 }
@@ -64,7 +62,7 @@ function cleanTikTokUrl(input) {
   return urlMatch[0].replace(/[)>,;]+$/, '');
 }
 
-// Fetch TikTok data with concurrent fast-racing strategies
+// Fast parallel resolve
 async function fetchTikTokData(rawInput) {
   const targetUrl = cleanTikTokUrl(rawInput);
   if (!targetUrl) {
@@ -75,7 +73,6 @@ async function fetchTikTokData(rawInput) {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'application/json, text/plain, */*'
     }
   }).then(r => r.data);
 
@@ -83,12 +80,10 @@ async function fetchTikTokData(rawInput) {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
-      'Accept': 'application/json, text/plain, */*'
     }
   }).then(r => r.data);
 
   try {
-    // Fast-race both endpoints: first successful response wins immediately!
     const data = await Promise.any([
       endpointA.then(d => { if (d && d.code === 0 && d.data) return d; throw new Error('A failed'); }),
       endpointB.then(d => { if (d && d.code === 0 && d.data) return d; throw new Error('B failed'); })
@@ -135,7 +130,6 @@ async function fetchTikTokData(rawInput) {
       return payload;
     }
   } catch (err) {
-    // Fallback GET
     try {
       const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`, {
         headers: { 'User-Agent': 'Mozilla/5.0' }
@@ -164,14 +158,14 @@ async function fetchTikTokData(rawInput) {
   throw new Error('Unable to resolve TikTok. Make sure post is public.');
 }
 
-// Ultra-fast In-Memory ZIP Archiver (Level 1 compression for instant packaging)
+// Ultra-fast In-Memory ZIP Archiver (Level 0/1 compression for instant packaging)
 async function streamZipArchive(res, images, title, musicUrl) {
   const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
 
-  // Level 1 deflate gives maximum speed (10x faster) since JPEGs are already compressed
+  // Level 1 = instant packaging (0 delay)
   const archive = archiver('zip', { zlib: { level: 1 } });
 
   archive.on('error', (err) => {
@@ -232,23 +226,34 @@ app.post('/api/resolve', async (req, res) => {
   }
 });
 
-// Clean Direct Video Download by ID: /api/download/:id/video
+// Direct Pipe Video Download with Zero Buffer Delay: /api/download/:id/video
 app.get('/api/download/:id/video', async (req, res) => {
   const { id } = req.params;
-  const item = mediaCache.get(id);
+  let item = mediaCache.get(id);
+
+  // If not cached, resolve on the fly if target url is passed in query
+  if (!item && req.query.url) {
+    try {
+      item = await fetchTikTokData(req.query.url);
+    } catch (e) {}
+  }
 
   if (!item || !item.videoUrl) {
-    return res.status(404).send('Download session expired or video not found. Please paste link again.');
+    return res.status(404).send('Download session expired. Please paste link again.');
   }
 
   const safeFilename = `${sanitizeFilename(item.title, 'tiktok_video')}.mp4`;
 
   try {
-    const videoResponse = await fastAxios({
+    const videoResponse = await axios({
       method: 'GET',
       url: item.videoUrl,
       responseType: 'stream',
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      decompress: false, // Don't waste CPU decompressing, pipe raw bytes directly
+      timeout: 30000,
     });
 
     res.setHeader('Content-Type', 'video/mp4');
@@ -257,6 +262,7 @@ app.get('/api/download/:id/video', async (req, res) => {
       res.setHeader('Content-Length', videoResponse.headers['content-length']);
     }
 
+    // Direct pipe straight to the client socket without buffering in RAM
     videoResponse.data.pipe(res);
   } catch (err) {
     if (!res.headersSent) res.status(500).send('Failed to stream video.');
