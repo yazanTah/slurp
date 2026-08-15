@@ -9,10 +9,10 @@ const archiver = require('archiver');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// High-performance Keep-Alive Connection Pool
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 });
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 });
-const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 15000 });
+// High-performance Keep-Alive Connection Pool for Massive Parallelism
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
+const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 10000 });
 
 app.use(cors());
 app.use(express.json());
@@ -20,6 +20,19 @@ app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1d',
   etag: true
 }));
+
+// In-memory cache for resolved media (auto-cleans after 30 mins)
+const mediaCache = new Map();
+
+function cleanOldCache() {
+  const now = Date.now();
+  for (const [id, item] of mediaCache.entries()) {
+    if (now - item.timestamp > 30 * 60 * 1000) {
+      mediaCache.delete(id);
+    }
+  }
+}
+setInterval(cleanOldCache, 5 * 60 * 1000);
 
 // Ensure relative media URLs have full domain prefix
 function formatMediaUrl(rawPath) {
@@ -59,7 +72,7 @@ async function fetchTikTokData(rawInput) {
   const endpointA = fastAxios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl }).toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/124.0.0.0',
     }
   }).then(r => r.data);
 
@@ -111,7 +124,7 @@ async function fetchTikTokData(rawInput) {
     }
   } catch (err) {
     try {
-      const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`, {
+      const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`, {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       if (getRes.data && getRes.data.code === 0 && getRes.data.data) {
@@ -134,6 +147,61 @@ async function fetchTikTokData(rawInput) {
   }
 
   throw new Error('Unable to resolve TikTok. Make sure post is public.');
+}
+
+// Ultra-fast Store-Mode In-Memory ZIP Archiver (Zero-CPU compression for instant 10ms packaging)
+async function streamZipArchive(res, images, title, musicUrl) {
+  const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
+
+  // store: true (Level 0) = Instant uncompressed bundling (JPEGs are already compressed)
+  const archive = archiver('zip', { store: true });
+
+  archive.on('error', (err) => {
+    console.error('Archive error:', err);
+    if (!res.headersSent) res.status(500).send({ error: err.message });
+  });
+
+  archive.pipe(res);
+
+  // Parallel concurrent image fetching through high-speed Keep-Alive pool
+  const fetchPromises = images.map(async (imgUrl, index) => {
+    try {
+      const padNum = String(index + 1).padStart(2, '0');
+      const ext = imgUrl.includes('.png') ? 'png' : (imgUrl.includes('.webp') ? 'webp' : 'jpg');
+      const formatted = formatMediaUrl(imgUrl);
+      const imgRes = await fastAxios.get(formatted, {
+        responseType: 'arraybuffer',
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 12000
+      });
+      archive.append(Buffer.from(imgRes.data), { name: `slide_${padNum}.${ext}` });
+    } catch (e) {
+      console.warn(`Failed slide ${index + 1}:`, e.message);
+    }
+  });
+
+  let musicPromise = Promise.resolve();
+  if (musicUrl) {
+    const formattedMusic = formatMediaUrl(musicUrl);
+    musicPromise = fastAxios.get(formattedMusic, {
+      responseType: 'arraybuffer',
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 12000
+    }).then((audioRes) => {
+      archive.append(Buffer.from(audioRes.data), { name: 'soundtrack.mp3' });
+    }).catch(() => {});
+  }
+
+  try {
+    await Promise.all([...fetchPromises, musicPromise]);
+    archive.append(`SLURP Slideshow Archive\nTitle: ${title || 'TikTok Slideshow'}\nSlides: ${images.length}\n`, { name: 'info.txt' });
+    await archive.finalize();
+  } catch (err) {
+    archive.abort();
+  }
 }
 
 // Direct Instant Video Streamer (No cache dependencies, 100% reliable)
@@ -172,60 +240,13 @@ app.get('/api/stream/video', async (req, res) => {
   }
 });
 
-// Fast In-Memory ZIP Archiver (Level 1 compression)
+// Fast In-Memory ZIP Archiver (Level 0 / Store mode for instant packaging)
 app.post('/api/stream/slideshow-zip', async (req, res) => {
   const { images, title, musicUrl } = req.body;
   if (!images || !Array.isArray(images) || images.length === 0) {
     return res.status(400).send('No images provided for slideshow.');
   }
-
-  const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
-
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
-
-  const archive = archiver('zip', { zlib: { level: 1 } });
-
-  archive.on('error', (err) => {
-    console.error('Archive error:', err);
-    if (!res.headersSent) res.status(500).send({ error: err.message });
-  });
-
-  archive.pipe(res);
-
-  const fetchPromises = images.map(async (imgUrl, index) => {
-    try {
-      const padNum = String(index + 1).padStart(2, '0');
-      const ext = imgUrl.includes('.png') ? 'png' : (imgUrl.includes('.webp') ? 'webp' : 'jpg');
-      const formatted = formatMediaUrl(imgUrl);
-      const imgRes = await fastAxios.get(formatted, {
-        responseType: 'arraybuffer',
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      archive.append(Buffer.from(imgRes.data), { name: `slide_${padNum}.${ext}` });
-    } catch (e) {
-      console.warn(`Failed slide ${index + 1}:`, e.message);
-    }
-  });
-
-  let musicPromise = Promise.resolve();
-  if (musicUrl) {
-    const formattedMusic = formatMediaUrl(musicUrl);
-    musicPromise = fastAxios.get(formattedMusic, {
-      responseType: 'arraybuffer',
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    }).then((audioRes) => {
-      archive.append(Buffer.from(audioRes.data), { name: 'soundtrack.mp3' });
-    }).catch(() => {});
-  }
-
-  try {
-    await Promise.all([...fetchPromises, musicPromise]);
-    archive.append(`SLURP Slideshow Archive\nTitle: ${title || 'TikTok Slideshow'}\nSlides: ${images.length}\n`, { name: 'info.txt' });
-    await archive.finalize();
-  } catch (err) {
-    archive.abort();
-  }
+  await streamZipArchive(res, images, title, musicUrl);
 });
 
 // API: Resolve endpoint

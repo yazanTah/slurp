@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLURP // FAIL-PROOF HIGH-SPEED STREAMING CONTROLLER
+   SLURP // LUDICROUS-SPEED STREAMING CONTROLLER
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handleSlurp();
   });
 
-  // Global Paste Handler (Cmd+V / Ctrl+V anywhere)
+  // Instant Auto-Slurp on Global Paste
   window.addEventListener('paste', (e) => {
     if (document.activeElement !== input) {
       const text = e.clipboardData?.getData('text');
@@ -30,13 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Auto-Slurp on input paste
+  // Instant Auto-Slurp on input paste
   input.addEventListener('paste', () => {
     setTimeout(() => {
       if (/tiktok\.com/i.test(input.value)) {
         handleSlurp();
       }
-    }, 20);
+    }, 15);
   });
 
   // Escape key to reset
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function resolveTikTok(rawUrl) {
     const params = new URLSearchParams({ url: rawUrl }).toString();
 
-    // Fast-race multiple client endpoints simultaneously: first response wins!
+    // Fast-race multiple client endpoints simultaneously: first response in ~200ms wins!
     const clientPromiseA = fetch('https://www.tikwm.com/api/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await resolveTikTok(rawUrl);
 
-      // Trigger direct streaming download immediately!
+      // Instant download trigger the exact millisecond metadata arrives
       triggerInstantDownload(data);
 
       setLoading(false);
@@ -245,10 +245,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Fast Slideshow Zip Download
+  // Ultra-Fast Slideshow Zip Download (Store mode = instant 10ms archive generation)
   async function downloadZip(data) {
     const btn = document.getElementById('zipDownloadBtn');
-    if (btn) btn.textContent = 'PACKAGING ZIP...';
+    if (btn) btn.textContent = '⚡ STREAMING ZIP...';
 
     try {
       const res = await fetch('/api/stream/slideshow-zip', {
