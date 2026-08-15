@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLURP // CLIENT CONTROLLER
+   SLURP // CLIENT CONTROLLER (HYBRID CLIENT-RESILIENT RESOLVER)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,6 +35,79 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') resetUI();
   });
 
+  // URL Helper
+  function formatMediaUrl(rawPath) {
+    if (!rawPath || typeof rawPath !== 'string') return null;
+    if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) return rawPath;
+    return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
+  }
+
+  // Normalize TikWM payload into SLURP schema
+  function normalizeTikwmData(d) {
+    const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
+    const rawVideo = isSlideshow ? null : (d.play || d.hdplay || d.wmplay);
+    const rawHdVideo = d.hdplay || d.play;
+
+    return {
+      success: true,
+      id: String(d.id || Date.now()),
+      title: d.title || 'TikTok Media',
+      author: {
+        name: d.author?.nickname || 'TikTok Creator',
+        username: d.author?.unique_id || 'user',
+        avatar: formatMediaUrl(d.author?.avatar) || '',
+      },
+      cover: formatMediaUrl(d.cover || d.origin_cover),
+      duration: d.duration || 0,
+      music: formatMediaUrl(d.music || d.music_info?.play),
+      musicTitle: d.music_info?.title || 'Soundtrack',
+      type: isSlideshow ? 'slideshow' : 'video',
+      videoUrl: formatMediaUrl(rawVideo),
+      hdVideoUrl: formatMediaUrl(rawHdVideo),
+      images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
+      stats: {
+        likes: d.digg_count || 0,
+        comments: d.comment_count || 0,
+        shares: d.share_count || 0,
+        views: d.play_count || 0,
+      }
+    };
+  }
+
+  // Hybrid Resolver (Tries direct client fetch from user IP first, then server fallback)
+  async function resolveTikTok(rawUrl) {
+    // 1. Direct Client-Side Fetch (Bypasses all cloud host datacenter IP blocks!)
+    try {
+      const params = new URLSearchParams({ url: rawUrl, hd: '1' });
+      const clientRes = await fetch('https://www.tikwm.com/api/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: params.toString()
+      });
+      if (clientRes.ok) {
+        const clientData = await clientRes.json();
+        if (clientData && clientData.code === 0 && clientData.data) {
+          return normalizeTikwmData(clientData.data);
+        }
+      }
+    } catch (err) {
+      console.warn('Direct client resolve fallback to server:', err);
+    }
+
+    // 2. Server API Fallback
+    const serverRes = await fetch('/api/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: rawUrl }),
+    });
+
+    const serverData = await serverRes.json();
+    if (!serverRes.ok || !serverData.success) {
+      throw new Error(serverData.error || 'Failed to extract TikTok media.');
+    }
+    return serverData;
+  }
+
   async function handleSlurp() {
     const rawUrl = input.value.trim();
     if (!rawUrl) {
@@ -46,16 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusLine.textContent = 'slurping signal...';
 
     try {
-      const res = await fetch('/api/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: rawUrl }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to slurp. Make sure the TikTok link is public.');
-      }
+      const data = await resolveTikTok(rawUrl);
 
       setLoading(false);
       statusLine.textContent = data.type === 'video' ? 'video slurped' : `slideshow slurped (${data.images.length} photos)`;
@@ -79,20 +143,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let downloadHtml = '';
 
     if (isVideo) {
-      const directDownloadUrl = `/api/download/${data.id}/video`;
       previewHtml = `
         <div class="preview-mini-stage">
           <video src="${data.videoUrl}" controls playsinline autoplay muted></video>
         </div>
       `;
       downloadHtml = `
-        <a href="${directDownloadUrl}" class="btn-slurp-download" download="${filename}.mp4">
-          ↓ DOWNLOAD .MP4
-        </a>
+        <button type="button" class="btn-slurp-download" id="videoDownloadBtn">
+          ↓ DOWNLOAD .MP4 [NO WATERMARK]
+        </button>
       `;
     } else {
       // Slideshow
-      const directZipUrl = `/api/download/${data.id}/slideshow.zip`;
       const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" />`).join('');
       previewHtml = `
         <div class="slideshow-mini-reel">
@@ -100,9 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       downloadHtml = `
-        <a href="${directZipUrl}" class="btn-slurp-download" download="${filename}_slideshow.zip">
+        <button type="button" class="btn-slurp-download" id="zipDownloadBtn">
           📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS + AUDIO)
-        </a>
+        </button>
       `;
     }
 
@@ -123,6 +185,16 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.getElementById('outputResetBtn')?.addEventListener('click', resetUI);
+
+    if (isVideo) {
+      document.getElementById('videoDownloadBtn')?.addEventListener('click', () => {
+        downloadDirectVideo(data);
+      });
+    } else {
+      document.getElementById('zipDownloadBtn')?.addEventListener('click', () => {
+        downloadZip(data);
+      });
+    }
   }
 
   function renderError(msg) {
@@ -137,20 +209,81 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('outputResetBtn')?.addEventListener('click', resetUI);
   }
 
+  // Trigger Automatic Download
   function triggerAutoDownload(data) {
-    const downloadUrl = data.type === 'video' 
-      ? `/api/download/${data.id}/video`
-      : `/api/download/${data.id}/slideshow.zip`;
-    const filename = data.type === 'video' 
-      ? `${sanitize(data.title)}.mp4` 
-      : `${sanitize(data.title)}_slideshow.zip`;
+    if (data.type === 'video') {
+      downloadDirectVideo(data);
+    } else {
+      downloadZip(data);
+    }
+  }
 
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.setAttribute('download', filename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // Direct High-Speed Video Download (Blob stream fallback)
+  async function downloadDirectVideo(data) {
+    const filename = `${sanitize(data.title)}.mp4`;
+    const btn = document.getElementById('videoDownloadBtn');
+
+    try {
+      if (btn) btn.textContent = 'DOWNLOADING .MP4...';
+      const res = await fetch(data.videoUrl);
+      if (!res.ok) throw new Error('Direct fetch error');
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+
+      if (btn) btn.textContent = '↓ DOWNLOAD .MP4 [NO WATERMARK]';
+    } catch (e) {
+      // Fallback to direct URL anchor click
+      const a = document.createElement('a');
+      a.href = data.videoUrl;
+      a.target = '_blank';
+      a.setAttribute('download', filename);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (btn) btn.textContent = '↓ DOWNLOAD .MP4 [NO WATERMARK]';
+    }
+  }
+
+  // Slideshow Zip Archiver Download
+  async function downloadZip(data) {
+    const btn = document.getElementById('zipDownloadBtn');
+    if (btn) btn.textContent = 'PACKAGING ZIP...';
+
+    try {
+      const res = await fetch('/api/stream/slideshow-zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: data.images,
+          title: sanitize(data.title),
+          musicUrl: data.music,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create ZIP');
+
+      const blob = await res.blob();
+      const zipUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = zipUrl;
+      a.download = `${sanitize(data.title)}_slideshow.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(zipUrl);
+
+      if (btn) btn.textContent = `📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS + AUDIO)`;
+    } catch (err) {
+      if (btn) btn.textContent = 'RETRY ZIP DOWNLOAD';
+    }
   }
 
   function setLoading(isLoading) {
