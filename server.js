@@ -54,57 +54,60 @@ function cleanTikTokUrl(input) {
   return urlMatch[0].replace(/[)>,;]+$/, '');
 }
 
-// Fetch TikTok data with multiple cloud-safe strategies
+// Fetch TikTok data with multiple verified DNS strategies
 async function fetchTikTokData(rawInput) {
   const targetUrl = cleanTikTokUrl(rawInput);
   if (!targetUrl) {
     throw new Error('Please enter a valid TikTok link.');
   }
 
-  const strategies = [
-    // Strategy 1: TikWM POST with mobile app headers (Bypasses Cloudflare 403 on cloud hosts)
-    async () => {
-      const params = new URLSearchParams({ url: targetUrl, hd: '1' });
-      const res = await axios.post('https://www.tikwm.com/api/', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'User-Agent': 'com.ss.android.ugc.trill/260103 (Linux; U; Android 12; en_US; Pixel 6; Build/SQ3A.220705.004; Cronet/58.0.2991.0)',
-          'Accept': 'application/json, text/plain, */*',
-        },
-        timeout: 10000,
-      });
-      return res.data;
+  const endpoints = [
+    // Endpoint 1: www.tikwm.com POST
+    {
+      url: 'https://www.tikwm.com/api/',
+      method: 'POST',
+      data: new URLSearchParams({ url: targetUrl, hd: '1' }).toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      }
     },
-    // Strategy 2: TikWM GET Query
-    async () => {
-      const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-        },
-        timeout: 10000,
-      });
-      return res.data;
+    // Endpoint 2: tikwm.com POST (Direct apex mirror)
+    {
+      url: 'https://tikwm.com/api/',
+      method: 'POST',
+      data: new URLSearchParams({ url: targetUrl, hd: '1' }).toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
+        'Accept': 'application/json, text/plain, */*'
+      }
     },
-    // Strategy 3: Mirror endpoint
-    async () => {
-      const params = new URLSearchParams({ url: targetUrl, count: '12', cursor: '0', web: '1', hd: '1' });
-      const res = await axios.post('https://api.tikwm.com/api/', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15',
-        },
-        timeout: 10000,
-      });
-      return res.data;
+    // Endpoint 3: www.tikwm.com GET
+    {
+      url: `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      }
     }
   ];
 
   let lastError = null;
 
-  for (const strategy of strategies) {
+  for (const ep of endpoints) {
     try {
-      const data = await strategy();
+      const response = await axios({
+        method: ep.method,
+        url: ep.url,
+        data: ep.data,
+        headers: ep.headers,
+        timeout: 12000,
+      });
+
+      const data = response.data;
       if (data && data.code === 0 && data.data) {
         const d = data.data;
         const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
@@ -145,15 +148,15 @@ async function fetchTikTokData(rawInput) {
         });
 
         return payload;
-      } else {
-        lastError = data?.msg || 'Post not found or private.';
+      } else if (data && data.msg) {
+        lastError = data.msg;
       }
     } catch (err) {
       lastError = err.message || 'Connection error.';
     }
   }
 
-  throw new Error(lastError || 'Unable to resolve TikTok. Make sure post is public.');
+  throw new Error(lastError || 'Unable to resolve TikTok link. Please make sure the video is public.');
 }
 
 // Helper: Bundle images and audio into a streaming zip
