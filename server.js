@@ -275,6 +275,23 @@ app.post('/api/stream/slideshow-zip', async (req, res) => {
   await streamZipArchive(res, images, title, musicUrl);
 });
 
+// Health check endpoint
+app.get('/api/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+// Automated Keep-Alive for Render Free Tier
+const externalUrl = process.env.RENDER_EXTERNAL_URL;
+if (externalUrl) {
+  const pingInterval = 12 * 60 * 1000; // 12 minutes
+  setInterval(() => {
+    axios.get(`${externalUrl}/api/ping`)
+      .then(() => console.log('🔄 Render Keep-Alive ping sent.'))
+      .catch((e) => console.warn('Keep-alive ping failed:', e.message));
+  }, pingInterval);
+  console.log(`📡 Auto Keep-Alive enabled for: ${externalUrl}`);
+}
+
 // Start Server on 0.0.0.0 for universal reachability
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`⚡ SLURP running on http://localhost:${PORT}`);
