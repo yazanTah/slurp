@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLURP // LUDICROUS-SPEED STREAMING CONTROLLER
+   SLURP // UNIVERSAL MULTI-PLATFORM MEDIA CONTROLLER
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,17 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const pulseBar = document.getElementById('pulseBar');
   const outputContent = document.getElementById('outputContent');
 
+  const MEDIA_REGEX = /(?:tiktok\.com|instagram\.com|instagr\.am|youtube\.com|youtu\.be|facebook\.com|fb\.watch|fb\.me|twitter\.com|x\.com)/i;
+
   // Submit Handler
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     handleSlurp();
   });
 
-  // Instant Auto-Slurp on Global Paste
+  // Global Paste Handler (Cmd+V / Ctrl+V anywhere)
   window.addEventListener('paste', (e) => {
     if (document.activeElement !== input) {
       const text = e.clipboardData?.getData('text');
-      if (text && /tiktok\.com/i.test(text)) {
+      if (text && MEDIA_REGEX.test(text)) {
         e.preventDefault();
         input.value = text.trim();
         handleSlurp();
@@ -33,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Instant Auto-Slurp on input paste
   input.addEventListener('paste', () => {
     setTimeout(() => {
-      if (/tiktok\.com/i.test(input.value)) {
+      if (MEDIA_REGEX.test(input.value)) {
         handleSlurp();
       }
     }, 15);
@@ -51,14 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
   }
 
-  // Normalize payload
+  // Normalize TikTok payload
   function normalizeTikwmData(d) {
     const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
     const rawVideo = isSlideshow ? null : (d.play || d.hdplay || d.wmplay);
-    const rawHdVideo = d.hdplay || d.play;
 
     return {
       success: true,
+      platform: 'tiktok',
       id: String(d.id || Date.now()),
       title: d.title || 'TikTok Media',
       author: {
@@ -72,61 +74,53 @@ document.addEventListener('DOMContentLoaded', () => {
       musicTitle: d.music_info?.title || 'Soundtrack',
       type: isSlideshow ? 'slideshow' : 'video',
       videoUrl: formatMediaUrl(rawVideo),
-      hdVideoUrl: formatMediaUrl(rawHdVideo),
       images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
-      stats: {
-        likes: d.digg_count || 0,
-        comments: d.comment_count || 0,
-        shares: d.share_count || 0,
-        views: d.play_count || 0,
-      }
     };
   }
 
-  // Blazing Fast Parallel Race Resolver
-  async function resolveTikTok(rawUrl) {
-    const params = new URLSearchParams({ url: rawUrl }).toString();
+  // Blazing Fast Universal Resolver
+  async function resolveMedia(rawUrl) {
+    const isTikTok = /tiktok\.com/i.test(rawUrl);
 
-    // Fast-race multiple client endpoints simultaneously: first response in ~200ms wins!
-    const clientPromiseA = fetch('https://www.tikwm.com/api/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: params
-    }).then(r => r.json()).then(d => {
-      if (d && d.code === 0 && d.data) return normalizeTikwmData(d.data);
-      throw new Error('A failed');
-    });
+    // If TikTok: race client endpoints with server for maximum speed
+    if (isTikTok) {
+      const params = new URLSearchParams({ url: rawUrl }).toString();
 
-    const clientPromiseB = fetch('https://tikwm.com/api/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: params
-    }).then(r => r.json()).then(d => {
-      if (d && d.code === 0 && d.data) return normalizeTikwmData(d.data);
-      throw new Error('B failed');
-    });
+      const clientA = fetch('https://www.tikwm.com/api/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: params
+      }).then(r => r.json()).then(d => {
+        if (d && d.code === 0 && d.data) return normalizeTikwmData(d.data);
+        throw new Error('Client A failed');
+      });
 
-    const serverFallback = fetch('/api/resolve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: rawUrl }),
-    }).then(r => r.json()).then(d => {
-      if (d && d.success) return d;
-      throw new Error('Server fallback failed');
-    });
-
-    try {
-      return await Promise.any([clientPromiseA, clientPromiseB, serverFallback]);
-    } catch (e) {
-      const lastRes = await fetch('/api/resolve', {
+      const serverCall = fetch('/api/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: rawUrl }),
+      }).then(r => r.json()).then(d => {
+        if (d && d.success) return d;
+        throw new Error('Server failed');
       });
-      const data = await lastRes.json();
-      if (!lastRes.ok || !data.success) throw new Error(data.error || 'Failed to extract TikTok media.');
-      return data;
+
+      try {
+        return await Promise.any([clientA, serverCall]);
+      } catch (e) {}
     }
+
+    // Instagram, YouTube, Facebook, Twitter/X via Server Resolver
+    const serverRes = await fetch('/api/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: rawUrl }),
+    });
+
+    const data = await serverRes.json();
+    if (!serverRes.ok || !data.success) {
+      throw new Error(data.error || 'Failed to extract media. Please check URL.');
+    }
+    return data;
   }
 
   async function handleSlurp() {
@@ -140,27 +134,29 @@ document.addEventListener('DOMContentLoaded', () => {
     statusLine.textContent = 'slurping signal...';
 
     try {
-      const data = await resolveTikTok(rawUrl);
+      const data = await resolveMedia(rawUrl);
 
-      // Instant download trigger the exact millisecond metadata arrives
+      // Instant direct stream trigger
       triggerInstantDownload(data);
 
       setLoading(false);
-      statusLine.textContent = data.type === 'video' ? 'video slurped' : `slideshow slurped (${data.images.length} photos)`;
+      const platLabel = (data.platform || 'media').toUpperCase();
+      statusLine.textContent = data.type === 'video' ? `${platLabel} video slurped` : `${platLabel} carousel slurped (${data.images.length} photos)`;
       renderOutput(data);
 
     } catch (err) {
       setLoading(false);
       statusLine.textContent = 'slurp failed';
-      renderError(err.message || 'Unable to extract TikTok. Check URL.');
+      renderError(err.message || 'Unable to extract media. Check URL.');
     }
   }
 
   function renderOutput(data) {
     outputSection.style.display = 'block';
     const isVideo = data.type === 'video';
-    const title = data.title || 'TikTok Media';
+    const title = data.title || 'Media';
     const filename = `${sanitize(title)}.mp4`;
+    const platform = (data.platform || 'media').toUpperCase();
     const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(title))}`;
 
     let previewHtml = '';
@@ -174,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       downloadHtml = `
         <a href="${streamUrl}" class="btn-slurp-download" download="${filename}">
-          ↓ DOWNLOAD .MP4 [NO WATERMARK]
+          ↓ DOWNLOAD .MP4 [${platform}]
         </a>
       `;
     } else {
@@ -186,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       downloadHtml = `
         <button type="button" class="btn-slurp-download" id="zipDownloadBtn">
-          📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS + AUDIO)
+          📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS)
         </button>
       `;
     }
@@ -195,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="slurp-status-row">
         <div class="slurp-badge">
           <span class="slurp-badge-dot"></span>
-          <span>${isVideo ? 'VIDEO' : `SLIDESHOW [${data.images.length}]`}</span>
+          <span>${platform} ${isVideo ? 'VIDEO' : `CAROUSEL [${data.images.length}]`}</span>
         </div>
         <button type="button" class="btn-mini-reset" id="outputResetBtn">✕ CLEAR</button>
       </div>
@@ -230,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Instant Streaming Download Trigger
   function triggerInstantDownload(data) {
-    if (data.type === 'video') {
+    if (data.type === 'video' && data.videoUrl) {
       const filename = `${sanitize(data.title)}.mp4`;
       const streamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}`;
       
@@ -240,12 +236,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(a);
       a.click();
       setTimeout(() => document.body.removeChild(a), 1000);
-    } else {
+    } else if (data.type === 'slideshow') {
       downloadZip(data);
     }
   }
 
-  // Ultra-Fast Slideshow Zip Download (Store mode = instant 10ms archive generation)
+  // Fast Slideshow Zip Download
   async function downloadZip(data) {
     const btn = document.getElementById('zipDownloadBtn');
     if (btn) btn.textContent = '⚡ STREAMING ZIP...';
@@ -273,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(zipUrl);
 
-      if (btn) btn.textContent = `📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS + AUDIO)`;
+      if (btn) btn.textContent = `📦 DOWNLOAD .ZIP (${data.images.length} PHOTOS)`;
     } catch (err) {
       if (btn) btn.textContent = 'RETRY ZIP DOWNLOAD';
     }
@@ -290,14 +286,14 @@ document.addEventListener('DOMContentLoaded', () => {
     outputSection.style.display = 'none';
     outputContent.innerHTML = '';
     pulseBar.classList.remove('active');
-    statusLine.textContent = 'paste link → get mp4 or zip';
+    statusLine.textContent = 'tiktok · instagram · youtube · facebook · x';
     goBtn.disabled = false;
     btnArrow.textContent = '↓';
     input.focus();
   }
 
   function sanitize(str) {
-    return (str || 'tiktok_media').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 35);
+    return (str || 'slurp_media').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 35);
   }
 
   function escapeHtml(str) {

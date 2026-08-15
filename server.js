@@ -5,6 +5,7 @@ const https = require('https');
 const http = require('http');
 const axios = require('axios');
 const archiver = require('archiver');
+const btch = require('btch-downloader');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 // High-performance Keep-Alive Connection Pool for Massive Parallelism
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
-const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 10000 });
+const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 12000 });
 
 app.use(cors());
 app.use(express.json());
@@ -42,7 +43,7 @@ function formatMediaUrl(rawPath) {
 }
 
 // Safe ASCII filename for HTTP Content-Disposition headers
-function sanitizeFilename(name, fallback = 'tiktok_media') {
+function sanitizeFilename(name, fallback = 'slurp_media') {
   if (!name) return fallback;
   const clean = name
     .replace(/[^\x20-\x7E]/g, '') // ASCII only
@@ -54,25 +55,33 @@ function sanitizeFilename(name, fallback = 'tiktok_media') {
   return clean || fallback;
 }
 
-// Clean and extract valid TikTok URL
-function cleanTikTokUrl(input) {
-  if (!input) return null;
-  const urlMatch = input.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)?tiktok\.com\/[^\s]+/i);
-  if (!urlMatch) return null;
-  return urlMatch[0].replace(/[)>,;]+$/, '');
+// Platform detector
+function detectPlatform(url) {
+  if (!url || typeof url !== 'string') return 'unknown';
+  if (/tiktok\.com/i.test(url)) return 'tiktok';
+  if (/instagram\.com|instagr\.am/i.test(url)) return 'instagram';
+  if (/youtube\.com|youtu\.be/i.test(url)) return 'youtube';
+  if (/facebook\.com|fb\.watch|fb\.me/i.test(url)) return 'facebook';
+  if (/twitter\.com|x\.com/i.test(url)) return 'twitter';
+  return 'unknown';
 }
 
-// Fast parallel resolve
-async function fetchTikTokData(rawInput) {
-  const targetUrl = cleanTikTokUrl(rawInput);
-  if (!targetUrl) {
-    throw new Error('Please enter a valid TikTok link.');
-  }
+// Clean and extract valid media URL
+function cleanMediaUrl(input) {
+  if (!input) return null;
+  const match = input.match(/https?:\/\/[^\s]+/i);
+  if (!match) return null;
+  return match[0].replace(/[)>,;]+$/, '');
+}
 
+// --- RESOLVERS ---
+
+// 1. TikTok Fast Resolver
+async function resolveTikTok(targetUrl) {
   const endpointA = fastAxios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl }).toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/124.0.0.0',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     }
   }).then(r => r.data);
 
@@ -94,13 +103,11 @@ async function fetchTikTokData(rawInput) {
       const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
       const mediaId = String(d.id || Date.now());
 
-      const rawVideo = isSlideshow ? null : (d.play || d.hdplay || d.wmplay);
-      const rawHdVideo = d.hdplay || d.play;
-
       return {
         success: true,
+        platform: 'tiktok',
         id: mediaId,
-        title: d.title || 'tiktok_media',
+        title: d.title || 'TikTok Media',
         author: {
           name: d.author?.nickname || 'TikTok Creator',
           username: d.author?.unique_id || 'user',
@@ -111,52 +118,204 @@ async function fetchTikTokData(rawInput) {
         music: formatMediaUrl(d.music || d.music_info?.play),
         musicTitle: d.music_info?.title || 'Soundtrack',
         type: isSlideshow ? 'slideshow' : 'video',
-        videoUrl: formatMediaUrl(rawVideo),
-        hdVideoUrl: formatMediaUrl(rawHdVideo),
+        videoUrl: formatMediaUrl(isSlideshow ? null : (d.play || d.hdplay || d.wmplay)),
         images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
-        stats: {
-          likes: d.digg_count || 0,
-          comments: d.comment_count || 0,
-          shares: d.share_count || 0,
-          views: d.play_count || 0,
-        },
       };
     }
   } catch (err) {
-    try {
-      const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      if (getRes.data && getRes.data.code === 0 && getRes.data.data) {
-        const d = getRes.data.data;
-        const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
-        const mediaId = String(d.id || Date.now());
+    const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (getRes.data && getRes.data.code === 0 && getRes.data.data) {
+      const d = getRes.data.data;
+      const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
+      return {
+        success: true,
+        platform: 'tiktok',
+        id: String(d.id || Date.now()),
+        title: d.title || 'TikTok Media',
+        type: isSlideshow ? 'slideshow' : 'video',
+        videoUrl: formatMediaUrl(d.play || d.hdplay),
+        images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
+        music: formatMediaUrl(d.music)
+      };
+    }
+  }
+  throw new Error('Could not resolve TikTok media.');
+}
 
+// 2. Instagram Resolver (Reels & Carousels)
+async function resolveInstagram(targetUrl) {
+  try {
+    const igData = await btch.igdl(targetUrl);
+    if (igData && igData.status && Array.isArray(igData.result) && igData.result.length > 0) {
+      const validItems = igData.result.filter(item => item.url);
+      if (validItems.length > 1) {
+        // Multi-image Carousel Slideshow
         return {
           success: true,
-          id: mediaId,
-          title: d.title || 'tiktok_media',
-          type: isSlideshow ? 'slideshow' : 'video',
-          videoUrl: formatMediaUrl(d.play || d.hdplay),
-          hdVideoUrl: formatMediaUrl(d.hdplay || d.play),
-          images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
-          music: formatMediaUrl(d.music)
+          platform: 'instagram',
+          id: String(Date.now()),
+          title: 'Instagram Carousel',
+          type: 'slideshow',
+          images: validItems.map(item => item.url),
+          cover: validItems[0].url
+        };
+      } else if (validItems.length === 1) {
+        const item = validItems[0];
+        const isVideo = item.url.includes('.mp4') || (item.thumbnail && item.thumbnail.length > 0);
+        return {
+          success: true,
+          platform: 'instagram',
+          id: String(Date.now()),
+          title: 'Instagram Media',
+          type: isVideo ? 'video' : 'slideshow',
+          videoUrl: isVideo ? item.url : null,
+          images: isVideo ? [] : [item.url],
+          cover: item.thumbnail || item.url
         };
       }
-    } catch (e) {}
+    }
+  } catch (e) {}
+
+  throw new Error('Unable to extract Instagram link. Make sure the post is public.');
+}
+
+// 3. YouTube & Shorts Resolver
+async function resolveYouTube(targetUrl) {
+  try {
+    const yt = await btch.youtube(targetUrl);
+    if (yt && yt.status && yt.mp4) {
+      return {
+        success: true,
+        platform: 'youtube',
+        id: String(Date.now()),
+        title: yt.title || 'YouTube Video',
+        author: { name: yt.author || 'YouTube Channel', username: yt.author || 'creator', avatar: '' },
+        cover: yt.thumbnail || '',
+        type: 'video',
+        videoUrl: yt.mp4,
+        music: yt.mp3,
+        musicTitle: 'Audio Track',
+        images: []
+      };
+    }
+  } catch (e) {}
+
+  throw new Error('Unable to extract YouTube video. Make sure the video is public.');
+}
+
+// 4. Facebook Resolver (Reels & Watch)
+async function resolveFacebook(targetUrl) {
+  // Strategy A: Direct High-Speed Regex Scraper
+  try {
+    const fbPage = await fastAxios.get(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      timeout: 8000
+    });
+    const html = fbPage.data;
+    const hdMatch = html.match(/"browser_native_hd_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/);
+    const sdMatch = html.match(/"browser_native_sd_url":"([^"]+)"/) || html.match(/"playable_url":"([^"]+)"/);
+    const videoRaw = hdMatch ? hdMatch[1] : (sdMatch ? sdMatch[1] : null);
+
+    if (videoRaw) {
+      const cleanVideoUrl = JSON.parse(`"${videoRaw}"`);
+      return {
+        success: true,
+        platform: 'facebook',
+        id: String(Date.now()),
+        title: 'Facebook Video',
+        type: 'video',
+        videoUrl: cleanVideoUrl,
+        images: []
+      };
+    }
+  } catch (e) {}
+
+  // Strategy B: btch.fbdown
+  try {
+    const fb = await btch.fbdown(targetUrl);
+    if (fb && fb.status && (fb.HD || fb.Normal_video)) {
+      return {
+        success: true,
+        platform: 'facebook',
+        id: String(Date.now()),
+        title: 'Facebook Video',
+        type: 'video',
+        videoUrl: fb.HD || fb.Normal_video,
+        images: []
+      };
+    }
+  } catch (e) {}
+
+  throw new Error('Unable to extract Facebook video. Make sure post is public.');
+}
+
+// 5. Twitter / X Resolver
+async function resolveTwitter(targetUrl) {
+  try {
+    const tw = await btch.twitter(targetUrl);
+    if (tw && tw.status && Array.isArray(tw.url) && tw.url.length > 0) {
+      const valid = tw.url.find(u => u.hd || u.sd || u.url);
+      const video = valid?.hd || valid?.sd || valid?.url || (typeof valid === 'string' ? valid : null);
+      if (video) {
+        return {
+          success: true,
+          platform: 'twitter',
+          id: String(Date.now()),
+          title: tw.title || 'X Video',
+          type: 'video',
+          videoUrl: video,
+          images: []
+        };
+      }
+    }
+  } catch (e) {}
+
+  throw new Error('Unable to extract X / Twitter video.');
+}
+
+// Universal Resolver Router
+async function resolveUniversalMedia(rawInput) {
+  const targetUrl = cleanMediaUrl(rawInput);
+  if (!targetUrl) {
+    throw new Error('Please enter a valid link (TikTok, Instagram, YouTube, Facebook, or X).');
   }
 
-  throw new Error('Unable to resolve TikTok. Make sure post is public.');
+  const platform = detectPlatform(targetUrl);
+
+  switch (platform) {
+    case 'tiktok':
+      return await resolveTikTok(targetUrl);
+    case 'instagram':
+      return await resolveInstagram(targetUrl);
+    case 'youtube':
+      return await resolveYouTube(targetUrl);
+    case 'facebook':
+      return await resolveFacebook(targetUrl);
+    case 'twitter':
+      return await resolveTwitter(targetUrl);
+    default:
+      // Try TikTok first, then YouTube, then Facebook as universal fallbacks
+      try { return await resolveTikTok(targetUrl); } catch (e) {}
+      try { return await resolveYouTube(targetUrl); } catch (e) {}
+      try { return await resolveFacebook(targetUrl); } catch (e) {}
+      throw new Error('Unsupported platform. Supported: TikTok, Instagram, YouTube, Facebook, and X.');
+  }
 }
 
 // Ultra-fast Store-Mode In-Memory ZIP Archiver (Zero-CPU compression for instant 10ms packaging)
 async function streamZipArchive(res, images, title, musicUrl) {
-  const safeZipName = `${sanitizeFilename(title, 'tiktok_slideshow')}.zip`;
+  const safeZipName = `${sanitizeFilename(title, 'slurp_slideshow')}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${safeZipName}"`);
 
-  // store: true (Level 0) = Instant uncompressed bundling (JPEGs are already compressed)
+  // store: true (Level 0) = Instant uncompressed bundling
   const archive = archiver('zip', { store: true });
 
   archive.on('error', (err) => {
@@ -197,7 +356,7 @@ async function streamZipArchive(res, images, title, musicUrl) {
 
   try {
     await Promise.all([...fetchPromises, musicPromise]);
-    archive.append(`SLURP Slideshow Archive\nTitle: ${title || 'TikTok Slideshow'}\nSlides: ${images.length}\n`, { name: 'info.txt' });
+    archive.append(`SLURP Multi-Platform Archive\nTitle: ${title || 'Media Slideshow'}\nSlides: ${images.length}\n`, { name: 'info.txt' });
     await archive.finalize();
   } catch (err) {
     archive.abort();
@@ -211,7 +370,7 @@ app.get('/api/stream/video', async (req, res) => {
     return res.status(400).send('Missing video URL.');
   }
 
-  const safeFilename = `${sanitizeFilename(title, 'tiktok_video')}.mp4`;
+  const safeFilename = `${sanitizeFilename(title, 'slurp_video')}.mp4`;
   const targetUrl = formatMediaUrl(url);
 
   try {
@@ -249,18 +408,18 @@ app.post('/api/stream/slideshow-zip', async (req, res) => {
   await streamZipArchive(res, images, title, musicUrl);
 });
 
-// API: Resolve endpoint
+// API: Universal Resolve endpoint
 app.post('/api/resolve', async (req, res) => {
   const { url } = req.body;
   if (!url) {
-    return res.status(400).json({ error: 'Please provide a TikTok link.' });
+    return res.status(400).json({ error: 'Please provide a valid link.' });
   }
 
   try {
-    const data = await fetchTikTokData(url);
+    const data = await resolveUniversalMedia(url);
     res.json(data);
   } catch (err) {
-    res.status(422).json({ error: err.message || 'Failed to process TikTok link.' });
+    res.status(422).json({ error: err.message || 'Failed to process media link.' });
   }
 });
 
@@ -282,5 +441,5 @@ if (externalUrl) {
 
 // Start Server on 0.0.0.0 for universal reachability
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`⚡ SLURP running on http://localhost:${PORT}`);
+  console.log(`⚡ SLURP Universal running on http://localhost:${PORT}`);
 });

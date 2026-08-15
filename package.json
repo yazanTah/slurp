@@ -1,7 +1,7 @@
 {
-  "name": "tiktok-clean-downloader",
-  "version": "1.0.0",
-  "description": "Unique minimalist TikTok video & slideshow zip downloader",
+  "name": "slurp-universal-downloader",
+  "version": "2.0.0",
+  "description": "Universal minimalist video & slideshow zip downloader for TikTok, Instagram, YouTube, Facebook, and X",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,6 +10,7 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "axios": "^1.7.9",
+    "btch-downloader": "^6.3.6",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   }

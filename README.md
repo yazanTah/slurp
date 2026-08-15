@@ -1,13 +1,13 @@
 <div align="center">
 
 # ⟁ S L U R P
-### *The Hyper-Fast, Zero-Bloat Media Extraction Engine*
+### *The Universal Multi-Platform Media Extraction Engine*
 
 [![Live Demo](https://img.shields.io/badge/LIVE%20DEMO-slurp--h1nk.onrender.com-d4ff28?style=for-the-badge&labelColor=070708&color=d4ff28)](https://slurp-h1nk.onrender.com)
 [![Author](https://img.shields.io/badge/ENGINEERED%20BY-yazanTah-ffffff?style=for-the-badge&labelColor=070708&logo=github)](https://github.com/yazanTah)
+[![Platforms](https://img.shields.io/badge/PLATFORMS-TIKTOK%20%7C%20INSTAGRAM%20%7C%20YOUTUBE%20%7C%20FB%20%7C%20X-d4ff28?style=for-the-badge&labelColor=070708)](https://slurp-h1nk.onrender.com)
 [![License: MIT](https://img.shields.io/badge/LICENSE-MIT-d4ff28?style=for-the-badge&labelColor=070708)](LICENSE)
 [![Node.js](https://img.shields.io/badge/NODE.JS-%E2%89%A518.0.0-339933?style=for-the-badge&labelColor=070708&logo=node.js)](package.json)
-[![Status](https://img.shields.io/badge/STATUS-PRODUCTION%20READY-success?style=for-the-badge&labelColor=070708)](https://slurp-h1nk.onrender.com)
 
 <br/>
 
@@ -26,7 +26,7 @@
 ```
 
 <p align="center">
-  <b>Paste TikTok link → Get clean MP4 or high-res ZIP. Nothing more, nothing less.</b><br/>
+  <b>Paste any link (TikTok · Instagram · YouTube · Facebook · X) → Get clean MP4 or high-res ZIP.</b><br/>
   <i>Crafted with brutalist-zen aesthetics and sub-second stream architecture by <a href="https://github.com/yazanTah"><b>@yazanTah</b></a>.</i>
 </p>
 
