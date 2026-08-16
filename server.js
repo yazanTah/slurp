@@ -7,6 +7,7 @@ const http = require('http');
 const axios = require('axios');
 const archiver = require('archiver');
 const btch = require('btch-downloader');
+const getFBInfo = require('@renpwn/fb-downloader');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,15 +39,18 @@ function formatMediaUrl(rawPath) {
   return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
 }
 
-// Safe ASCII filename for HTTP Content-Disposition headers
+// Safe descriptive filename for HTTP Content-Disposition headers
 function sanitizeFilename(name, fallback = 'slurp_media') {
   if (!name) return fallback;
   const clean = name
+    .replace(/https?:\/\/[^\s]+/g, '')
     .replace(/[^\x20-\x7E]/g, '') // ASCII only
     .replace(/[<>:"/\\|?*#%&=;+`~[\]$@!]/g, '')
+    .replace(/[\r\n\t]+/g, ' ')
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
-    .slice(0, 35)
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
     .trim();
   return clean || fallback;
 }
@@ -62,18 +66,78 @@ function detectPlatform(url) {
   return 'unknown';
 }
 
-// Clean and extract valid media URL
+// Clean and normalize media URLs from any browser address bar, share sheet, or text copy
 function cleanMediaUrl(input) {
   if (!input) return null;
   const match = input.match(/https?:\/\/[^\s]+/i);
   if (!match) return null;
-  return match[0].replace(/[)>,;]+$/, '');
+  let url = match[0].replace(/[)>,;:.!?'\"\]}]+$/, '');
+
+  // 1. Twitter / X: normalize all variations (status, web, modal, mobile, query params) to canonical post URL
+  const twMatch = url.match(/(?:twitter\.com|x\.com)\/(?:#!\/)?(?:[^\/\s]+\/status\/|status\/|i\/status\/|i\/web\/status\/)(\d+)/i);
+  if (twMatch && twMatch[1]) {
+    return `https://x.com/i/status/${twMatch[1]}`;
+  }
+
+  // 2. Facebook: strip tracking params (mibextid, rdid, ref, sfnsn) and normalize watch/reels
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('facebook.com') || u.hostname.includes('fb.watch') || u.hostname.includes('fb.me')) {
+      const v = u.searchParams.get('v');
+      u.search = v ? `?v=${v}` : '';
+      return u.toString().replace(/\/+$/, '');
+    }
+  } catch (e) {}
+
+  // 3. Instagram: clean tracking params while preserving post/reel ID
+  const igMatch = url.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+  if (igMatch && igMatch[1]) {
+    const type = url.includes('/reel') ? 'reel' : 'p';
+    return `https://www.instagram.com/${type}/${igMatch[1]}/`;
+  }
+
+  // 4. YouTube: normalize Shorts & Watch links
+  const ytShorts = url.match(/(?:youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]+)/i);
+  if (ytShorts && ytShorts[1]) {
+    if (url.includes('/shorts/')) {
+      return `https://www.youtube.com/shorts/${ytShorts[1]}`;
+    }
+    return `https://youtu.be/${ytShorts[1]}`;
+  }
+
+  return url;
+}
+
+// High-performance In-Memory Media Cache with 15-Minute TTL
+const RESOLVE_CACHE = new Map();
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+function getCachedMedia(key) {
+  const item = RESOLVE_CACHE.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiry) {
+    RESOLVE_CACHE.delete(key);
+    return null;
+  }
+  return item.data;
+}
+
+function setCachedMedia(key, data) {
+  // Prevent unbounded memory growth (max 1000 entries)
+  if (RESOLVE_CACHE.size > 1000) {
+    const oldestKey = RESOLVE_CACHE.keys().next().value;
+    if (oldestKey) RESOLVE_CACHE.delete(oldestKey);
+  }
+  RESOLVE_CACHE.set(key, { data, expiry: Date.now() + CACHE_TTL_MS });
 }
 
 // --- FAST RESOLVERS ---
 
 // 1. TikTok Fast Resolver
 async function resolveTikTok(targetUrl) {
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
   const endpointA = fastAxios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl }).toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -99,7 +163,7 @@ async function resolveTikTok(targetUrl) {
       const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
       const mediaId = String(d.id || Date.now());
 
-      return {
+      const result = {
         success: true,
         platform: 'tiktok',
         id: mediaId,
@@ -117,6 +181,8 @@ async function resolveTikTok(targetUrl) {
         videoUrl: formatMediaUrl(isSlideshow ? null : (d.play || d.hdplay || d.wmplay)),
         images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
       };
+      setCachedMedia(targetUrl, result);
+      return result;
     }
   } catch (err) {
     const getRes = await fastAxios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`, {
@@ -125,7 +191,7 @@ async function resolveTikTok(targetUrl) {
     if (getRes.data && getRes.data.code === 0 && getRes.data.data) {
       const d = getRes.data.data;
       const isSlideshow = Array.isArray(d.images) && d.images.length > 0;
-      return {
+      const result = {
         success: true,
         platform: 'tiktok',
         id: String(d.id || Date.now()),
@@ -135,6 +201,8 @@ async function resolveTikTok(targetUrl) {
         images: isSlideshow ? d.images.map(img => formatMediaUrl(img)) : [],
         music: formatMediaUrl(d.music)
       };
+      setCachedMedia(targetUrl, result);
+      return result;
     }
   }
   throw new Error('Could not resolve TikTok media.');
@@ -142,12 +210,15 @@ async function resolveTikTok(targetUrl) {
 
 // 2. Instagram Fast Resolver (Reels & Carousels)
 async function resolveInstagram(targetUrl) {
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
   try {
     const igData = await btch.igdl(targetUrl);
     if (igData && igData.status && Array.isArray(igData.result) && igData.result.length > 0) {
       const validItems = igData.result.filter(item => item.url);
       if (validItems.length > 1) {
-        return {
+        const result = {
           success: true,
           platform: 'instagram',
           id: String(Date.now()),
@@ -156,10 +227,12 @@ async function resolveInstagram(targetUrl) {
           images: validItems.map(item => item.url),
           cover: validItems[0].url
         };
+        setCachedMedia(targetUrl, result);
+        return result;
       } else if (validItems.length === 1) {
         const item = validItems[0];
         const isVideo = item.url.includes('.mp4') || (item.thumbnail && item.thumbnail.length > 0);
-        return {
+        const result = {
           success: true,
           platform: 'instagram',
           id: String(Date.now()),
@@ -169,6 +242,8 @@ async function resolveInstagram(targetUrl) {
           images: isVideo ? [] : [item.url],
           cover: item.thumbnail || item.url
         };
+        setCachedMedia(targetUrl, result);
+        return result;
       }
     }
   } catch (e) {}
@@ -178,10 +253,13 @@ async function resolveInstagram(targetUrl) {
 
 // 3. YouTube & Shorts Resolver
 async function resolveYouTube(targetUrl) {
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
   try {
     const yt = await btch.youtube(targetUrl);
     if (yt && yt.status && yt.mp4) {
-      return {
+      const result = {
         success: true,
         platform: 'youtube',
         id: String(Date.now()),
@@ -197,54 +275,148 @@ async function resolveYouTube(targetUrl) {
         audioUrl: yt.mp3 || '',
         images: []
       };
+      setCachedMedia(targetUrl, result);
+      return result;
     }
   } catch (e) {}
 
   throw new Error('Unable to extract YouTube video. Make sure the video is public.');
 }
 
-// 4. Facebook Reels & Watch Resolver
+// 4. Facebook Reels & Watch High-Speed Resolver (Dual-Engine Parallel Race)
 async function resolveFacebook(targetUrl) {
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
+  // Extract video ID or slug from target URL
+  let fbId = '';
   try {
-    const fb = await btch.fbdown(targetUrl);
-    if (fb && fb.status && (fb.HD || fb.Normal_video)) {
-      return {
-        success: true,
-        platform: 'facebook',
-        id: String(Date.now()),
-        title: 'Facebook Video',
-        type: 'video',
-        videoUrl: fb.HD || fb.Normal_video,
-        images: []
-      };
+    const u = new URL(targetUrl);
+    const v = u.searchParams.get('v');
+    if (v) fbId = v;
+    else {
+      const match = u.pathname.match(/(?:reel|videos|status|p|shorts|v)\/([A-Za-z0-9_-]+)/i);
+      if (match) fbId = match[1];
     }
   } catch (e) {}
 
-  throw new Error('Unable to extract Facebook video. Make sure post is public.');
+  function cleanFbTitle(rawTitle) {
+    if (rawTitle && typeof rawTitle === 'string' && !/^(facebook|facebook video|watch|reel|log in|log into facebook)$/i.test(rawTitle.trim())) {
+      const clean = rawTitle.replace(/ \| Facebook$/i, '').replace(/https?:\/\/[^\s]+/g, '').replace(/[\r\n\t]+/g, ' ').trim();
+      if (clean.length >= 3) return clean.slice(0, 80);
+    }
+    const type = targetUrl.includes('reel') ? 'Reel' : 'Video';
+    return fbId ? `Facebook_${type}_${fbId}` : `Facebook_${type}`;
+  }
+
+  // Engine A: Direct HTML/GraphQL Scraper via @renpwn/fb-downloader (~300ms)
+  const engineA = (async () => {
+    try {
+      const fb = await getFBInfo(targetUrl);
+      if (fb && (fb.hd || fb.sd)) {
+        return {
+          success: true,
+          platform: 'facebook',
+          id: fbId || String(Date.now()),
+          title: cleanFbTitle(fb.title),
+          cover: fb.thumbnail || '',
+          type: 'video',
+          videoUrl: fb.hd || fb.sd,
+          images: []
+        };
+      }
+    } catch (e) {}
+    throw new Error('Engine A failed');
+  })();
+
+  // Engine B: BTCH fbdown resolver
+  const engineB = (async () => {
+    try {
+      const fbPromise = btch.fbdown(targetUrl);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 6000));
+      const fb = await Promise.race([fbPromise, timeoutPromise]);
+      if (fb && fb.status && (fb.HD || fb.Normal_video)) {
+        return {
+          success: true,
+          platform: 'facebook',
+          id: fbId || String(Date.now()),
+          title: cleanFbTitle(fb.title),
+          type: 'video',
+          videoUrl: fb.HD || fb.Normal_video,
+          images: []
+        };
+      }
+    } catch (e) {}
+    throw new Error('Engine B failed');
+  })();
+
+  try {
+    const result = await Promise.any([engineA, engineB]);
+    setCachedMedia(targetUrl, result);
+    return result;
+  } catch (e) {}
+
+  throw new Error('Unable to extract Facebook video. Make sure post is public and not private/restricted.');
 }
 
 // 5. Twitter / X Fast Resolver
 async function resolveTwitter(targetUrl) {
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
+  let twId = '';
   try {
-    const tw = await btch.twitter(targetUrl);
-    if (tw && tw.status && Array.isArray(tw.url) && tw.url.length > 0) {
-      const valid = tw.url.find(u => u.hd || u.sd || u.url);
-      const video = valid?.hd || valid?.sd || valid?.url || (typeof valid === 'string' ? valid : null);
+    const match = targetUrl.match(/status\/(\d+)/i);
+    if (match) twId = match[1];
+  } catch (e) {}
+
+  function cleanTwTitle(rawTitle) {
+    if (rawTitle && typeof rawTitle === 'string' && !/^(x video|twitter video|tweet)$/i.test(rawTitle.trim())) {
+      const clean = rawTitle.replace(/https?:\/\/[^\s]+/g, '').replace(/[\r\n\t]+/g, ' ').trim();
+      if (clean.length >= 3) return clean.slice(0, 80);
+    }
+    return twId ? `X_Post_${twId}` : 'X_Video';
+  }
+
+  try {
+    const twPromise = btch.twitter(targetUrl);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000));
+    const tw = await Promise.race([twPromise, timeoutPromise]);
+
+    if (tw && tw.status) {
+      let video = null;
+      if (Array.isArray(tw.url) && tw.url.length > 0) {
+        const valid = tw.url.find(u => {
+          if (!u) return false;
+          if (typeof u === 'string' && u.startsWith('http')) return true;
+          return u.hd || u.sd || u.url;
+        });
+        if (valid) {
+          video = typeof valid === 'string' ? valid : (valid.hd || valid.sd || valid.url);
+        }
+      } else if (typeof tw.url === 'string' && tw.url.startsWith('http')) {
+        video = tw.url;
+      } else if (tw.HD || tw.Normal_video || tw.video) {
+        video = tw.HD || tw.Normal_video || tw.video;
+      }
+
       if (video) {
-        return {
+        const result = {
           success: true,
           platform: 'twitter',
-          id: String(Date.now()),
-          title: tw.title || 'X Video',
+          id: twId || String(Date.now()),
+          title: cleanTwTitle(tw.title),
           type: 'video',
           videoUrl: video,
           images: []
         };
+        setCachedMedia(targetUrl, result);
+        return result;
       }
     }
   } catch (e) {}
 
-  throw new Error('Unable to extract X / Twitter video.');
+  throw new Error('Unable to extract X / Twitter video. Please ensure the post is public and has a video.');
 }
 
 // Universal Resolver Router
@@ -254,25 +426,41 @@ async function resolveUniversalMedia(rawInput) {
     throw new Error('Please enter a valid link (TikTok, Instagram, YouTube, Facebook, or X).');
   }
 
+  const cached = getCachedMedia(targetUrl);
+  if (cached) return cached;
+
   const platform = detectPlatform(targetUrl);
+  let result = null;
 
   switch (platform) {
     case 'tiktok':
-      return await resolveTikTok(targetUrl);
+      result = await resolveTikTok(targetUrl);
+      break;
     case 'instagram':
-      return await resolveInstagram(targetUrl);
+      result = await resolveInstagram(targetUrl);
+      break;
     case 'youtube':
-      return await resolveYouTube(targetUrl);
+      result = await resolveYouTube(targetUrl);
+      break;
     case 'facebook':
-      return await resolveFacebook(targetUrl);
+      result = await resolveFacebook(targetUrl);
+      break;
     case 'twitter':
-      return await resolveTwitter(targetUrl);
+      result = await resolveTwitter(targetUrl);
+      break;
     default:
-      try { return await resolveTikTok(targetUrl); } catch (e) {}
-      try { return await resolveYouTube(targetUrl); } catch (e) {}
-      try { return await resolveFacebook(targetUrl); } catch (e) {}
-      throw new Error('Unsupported platform. Supported: TikTok, Instagram, YouTube, Facebook, and X.');
+      try { result = await resolveTikTok(targetUrl); } catch (e) {}
+      if (!result) { try { result = await resolveYouTube(targetUrl); } catch (e) {} }
+      if (!result) { try { result = await resolveFacebook(targetUrl); } catch (e) {} }
+      if (!result) {
+        throw new Error('Unsupported platform. Supported: TikTok, Instagram, YouTube, Facebook, and X.');
+      }
   }
+
+  if (result) {
+    setCachedMedia(targetUrl, result);
+  }
+  return result;
 }
 
 // Ultra-fast Store-Mode In-Memory ZIP Archiver (Zero-CPU compression for instant 10ms packaging)
@@ -328,9 +516,9 @@ async function streamZipArchive(res, images, title, musicUrl) {
   }
 }
 
-// Direct Instant Video Streamer (No cache dependencies, 100% reliable)
+// Direct Instant Video Streamer with Range & Hotlink-Bypass Support
 app.get('/api/stream/video', async (req, res) => {
-  const { url, title } = req.query;
+  const { url, title, inline } = req.query;
   if (!url) {
     return res.status(400).send('Missing video URL.');
   }
@@ -339,22 +527,52 @@ app.get('/api/stream/video', async (req, res) => {
   const targetUrl = formatMediaUrl(url);
 
   try {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': '*/*'
+    };
+
+    // Set origin/referer headers to bypass hotlinking 403 blocks
+    if (targetUrl.includes('twimg.com') || targetUrl.includes('twitter.com') || targetUrl.includes('x.com')) {
+      headers['Referer'] = 'https://twitter.com/';
+      headers['Origin'] = 'https://twitter.com';
+    } else if (targetUrl.includes('tikwm') || targetUrl.includes('tiktokcdn')) {
+      headers['Referer'] = 'https://www.tikwm.com/';
+    } else if (targetUrl.includes('instagram.com') || targetUrl.includes('cdninstagram.com')) {
+      headers['Referer'] = 'https://www.instagram.com/';
+    } else if (targetUrl.includes('facebook.com') || targetUrl.includes('fbcdn.net')) {
+      headers['Referer'] = 'https://www.facebook.com/';
+    }
+
+    // Forward range header for video player instant seeking & streaming
+    if (req.headers.range) {
+      headers['Range'] = req.headers.range;
+    }
+
     const videoResponse = await axios({
       method: 'GET',
       url: targetUrl,
       responseType: 'stream',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Referer': targetUrl.includes('tikwm') ? 'https://www.tikwm.com/' : undefined
-      },
-      timeout: 40000,
+      headers,
+      timeout: 45000,
+      validateStatus: (status) => status >= 200 && status < 400,
     });
 
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.status(videoResponse.status);
+    res.setHeader('Content-Type', videoResponse.headers['content-type'] || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    if (inline === '1' || inline === 'true') {
+      res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+    } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    }
+
     if (videoResponse.headers['content-length']) {
       res.setHeader('Content-Length', videoResponse.headers['content-length']);
+    }
+    if (videoResponse.headers['content-range']) {
+      res.setHeader('Content-Range', videoResponse.headers['content-range']);
     }
 
     videoResponse.data.pipe(res);

@@ -108,13 +108,56 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  // Clean & Normalize URL from address bar, share sheet, or pasted text
+  function cleanMediaUrl(input) {
+    if (!input) return null;
+    const match = input.match(/https?:\/\/[^\s]+/i);
+    if (!match) return null;
+    let url = match[0].replace(/[)>,;:.!?'\"\]}]+$/, '');
+
+    // 1. Twitter / X: normalize address bar, modal, mobile, share params to canonical post URL
+    const twMatch = url.match(/(?:twitter\.com|x\.com)\/(?:#!\/)?(?:[^\/\s]+\/status\/|status\/|i\/status\/|i\/web\/status\/)(\d+)/i);
+    if (twMatch && twMatch[1]) {
+      return `https://x.com/i/status/${twMatch[1]}`;
+    }
+
+    // 2. Facebook: strip tracking params (mibextid, rdid, ref, sfnsn) and normalize watch/reels
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('facebook.com') || u.hostname.includes('fb.watch') || u.hostname.includes('fb.me')) {
+        const v = u.searchParams.get('v');
+        u.search = v ? `?v=${v}` : '';
+        return u.toString().replace(/\/+$/, '');
+      }
+    } catch (e) {}
+
+    // 3. Instagram: clean tracking params while preserving post/reel ID
+    const igMatch = url.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+    if (igMatch && igMatch[1]) {
+      const type = url.includes('/reel') ? 'reel' : 'p';
+      return `https://www.instagram.com/${type}/${igMatch[1]}/`;
+    }
+
+    // 4. YouTube: normalize Shorts & Watch links
+    const ytShorts = url.match(/(?:youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]+)/i);
+    if (ytShorts && ytShorts[1]) {
+      if (url.includes('/shorts/')) {
+        return `https://www.youtube.com/shorts/${ytShorts[1]}`;
+      }
+      return `https://youtu.be/${ytShorts[1]}`;
+    }
+
+    return url;
+  }
+
   // Blazing Fast Universal Resolver
   async function resolveMedia(rawUrl) {
-    const isTikTok = /tiktok\.com/i.test(rawUrl);
+    const cleanUrl = cleanMediaUrl(rawUrl) || rawUrl;
+    const isTikTok = /tiktok\.com/i.test(cleanUrl);
 
     // If TikTok: race client endpoints with server for maximum speed
     if (isTikTok) {
-      const params = new URLSearchParams({ url: rawUrl }).toString();
+      const params = new URLSearchParams({ url: cleanUrl }).toString();
 
       const clientA = fetch('https://www.tikwm.com/api/', {
         method: 'POST',
@@ -128,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const serverCall = fetch('/api/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: rawUrl }),
+        body: JSON.stringify({ url: cleanUrl }),
       }).then(r => r.json()).then(d => {
         if (d && d.success) return d;
         throw new Error('Server failed');
@@ -143,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const serverRes = await fetch('/api/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: rawUrl }),
+      body: JSON.stringify({ url: cleanUrl }),
     });
 
     const data = await serverRes.json();
@@ -154,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function handleSlurp() {
-    const rawUrl = input.value.trim();
+    const rawUrl = cleanMediaUrl(input.value.trim()) || input.value.trim();
     if (!rawUrl) {
       input.focus();
       return;
@@ -183,12 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getDownloadUrl(data) {
     if (!data.videoUrl) return '';
-    // For TikTok, route through /api/stream/video
-    if (data.platform === 'tiktok') {
-      return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}`;
-    }
-    // For YouTube, FB, Twitter, Instagram: direct CDN link bypasses server proxy blocks
-    return data.videoUrl;
+    // Route all video downloads through same-origin stream endpoint to guarantee clean auto-download,
+    // custom filename header, and 100% bypass of 403 / CORS hotlinking protection.
+    return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=${encodeURIComponent(data.platform || 'video')}`;
   }
 
   function renderOutput(data) {
@@ -203,18 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let downloadHtml = '';
 
     if (isVideo) {
+      const previewStreamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&inline=1`;
       previewHtml = `
         <div class="preview-mini-stage">
-          <video src="${data.videoUrl}" controls playsinline autoplay muted></video>
+          <video src="${previewStreamUrl}" controls playsinline autoplay muted referrerpolicy="no-referrer"></video>
         </div>
       `;
       downloadHtml = `
-        <a href="${downloadUrl}" class="btn-slurp-download" download="${filename}" target="_blank" rel="noopener noreferrer">
+        <a href="${downloadUrl}" class="btn-slurp-download" download="${filename}">
           ↓ DOWNLOAD .MP4 [${platform}]
         </a>
       `;
     } else {
-      const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" loading="lazy" />`).join('');
+      const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" loading="lazy" referrerpolicy="no-referrer" />`).join('');
       previewHtml = `
         <div class="slideshow-mini-reel">
           ${thumbs}
@@ -273,10 +314,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.setAttribute('download', filename);
-      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => document.body.removeChild(a), 1000);
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 1000);
     } else if (data.type === 'slideshow') {
       downloadZip(data);
     }
@@ -334,7 +376,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function sanitize(str) {
-    return (str || 'slurp_media').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 35);
+    return (str || 'slurp_media')
+      .replace(/https?:\/\/[^\s]+/g, '')
+      .replace(/[^\x20-\x7E]/g, '')
+      .replace(/[<>:"/\\|?*#%&=;+`~[\]$@!]/g, '')
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 80) || 'slurp_media';
   }
 
   function escapeHtml(str) {

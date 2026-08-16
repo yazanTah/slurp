@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
+    "@renpwn/fb-downloader": "^1.0.16",
     "archiver": "^7.0.1",
     "axios": "^1.7.9",
     "btch-downloader": "^6.3.6",
