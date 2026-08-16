@@ -721,8 +721,9 @@ function getLandingTemplate() {
 function getBaseUrl(req) {
   if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
   if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host = req.get('host') || `localhost:${PORT}`;
+  const host = req.headers['x-forwarded-host'] || req.get('host') || `localhost:${PORT}`;
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const protocol = req.headers['x-forwarded-proto'] || (isLocal ? req.protocol : 'https');
   return `${protocol}://${host}`;
 }
 
