@@ -409,8 +409,41 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(32px, 6vh, 64px);
+  gap: clamp(32px, 6vh, 56px);
   margin: 0 auto;
+}
+
+/* Breadcrumb Navigation */
+.breadcrumb-bar {
+  width: 100%;
+  margin-bottom: -12px;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.breadcrumb-list a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.breadcrumb-list a:hover {
+  color: var(--accent);
+}
+
+.breadcrumb-sep {
+  color: var(--surface-border);
+}
+
+.breadcrumb-current {
+  color: var(--text-muted);
 }
 
 .content-container {
@@ -451,6 +484,32 @@ body {
   color: var(--text-muted);
   line-height: 1.5;
   margin-top: -6px;
+}
+
+/* Princeton GEO Answer Box */
+.geo-answer-box {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.geo-answer-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.geo-answer-text {
+  font-size: 12.5px;
+  color: var(--text-main);
+  line-height: 1.6;
 }
 
 .steps-grid {
@@ -652,9 +711,9 @@ body {
 
 .footer-links {
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 16px;
 }
 
 .footer-links a {

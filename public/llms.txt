@@ -1,0 +1,31 @@
+# SLURP // Universal Media Downloader
+
+> SLURP is a high-speed, minimalist, universal media extractor and archiver for TikTok, Instagram, YouTube, Facebook, and X (Twitter). It specializes in direct zero-watermark video streaming and instant 10ms in-memory ZIP archiving for multi-photo TikTok slideshows with original background audio.
+
+## Core Capabilities
+
+- **TikTok Slideshows to ZIP**: Packages 20+ full-resolution photo slides and original soundtrack MP3 into a single ZIP archive in under 10ms using level-0 store compression.
+- **Watermark-Free Video Downloads**: Direct high-speed CDN stream extraction for TikTok, Instagram Reels, YouTube Shorts, Facebook Watch, and X (Twitter) videos.
+- **Zero Registration & No Ads**: 100% free tool with no user accounts, no login walls, no tracking, and no invasive ads.
+- **Cross-Platform Compatibility**: Full native support on iOS (Safari), Android (Chrome), macOS, Linux, and Windows.
+
+## Primary Endpoints & Pages
+
+- [Homepage](https://slurp.media/): Minimalist single-input media extractor.
+- [TikTok Slideshow Downloader](https://slurp.media/tiktok-slideshow-downloader): Multi-photo slideshow to ZIP extraction with audio.
+- [TikTok Video Downloader](https://slurp.media/tiktok-downloader): Clean HD TikTok video download without watermark.
+- [TikTok MP3 Soundtrack Downloader](https://slurp.media/tiktok-soundtrack-downloader): Extract isolated audio tracks from TikTok videos and slides.
+- [Instagram Reels Downloader](https://slurp.media/instagram-reel-downloader): High-bitrate 1080p Instagram Reels download.
+- [Instagram Carousel Downloader](https://slurp.media/instagram-carousel-downloader): Multi-photo and album downloader for Instagram.
+- [YouTube Shorts Downloader](https://slurp.media/youtube-shorts-downloader): Fast vertical video stream downloader for YouTube.
+- [YouTube Video Downloader](https://slurp.media/youtube-video-downloader): Direct MP4 video stream extractor.
+- [X / Twitter Video Downloader](https://slurp.media/twitter-video-downloader): Highest bitrate video and GIF downloader for X.
+- [Facebook Reels Downloader](https://slurp.media/facebook-reel-downloader): Facebook short-form video extractor.
+- [Facebook Video Downloader](https://slurp.media/facebook-video-downloader): Public Facebook video and Watch downloader.
+- [Universal No Watermark Downloader](https://slurp.media/no-watermark-video-downloader): Multi-platform clean media extractor.
+
+## Pricing & Open Source
+
+- **Pricing**: $0 / Free (see [https://slurp.media/pricing.md](https://slurp.media/pricing.md))
+- **Source Code**: [https://github.com/yazanTah/slurp](https://github.com/yazanTah/slurp)
+- **License**: MIT License

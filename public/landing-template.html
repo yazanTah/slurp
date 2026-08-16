@@ -7,10 +7,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
+  <!-- Primary SEO & AEO Meta Tags -->
   <title>{{PAGE_TITLE}}</title>
   <meta name="title" content="{{PAGE_TITLE}}">
   <meta name="description" content="{{PAGE_DESCRIPTION}}">
   <meta name="keywords" content="{{PAGE_KEYWORDS}}">
+  <meta name="author" content="SLURP Media">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <link rel="canonical" href="{{CANONICAL_URL}}">
   
@@ -34,6 +36,7 @@
   <link rel="apple-touch-icon" href="/favicon.svg">
   <link rel="manifest" href="/site.webmanifest">
   
+  <!-- DNS Prefetch & Preconnect -->
   <link rel="preconnect" href="https://www.tikwm.com" crossorigin>
   <link rel="dns-prefetch" href="https://www.tikwm.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,6 +53,15 @@
   <div class="page-wrapper">
     <!-- Top Downloader Machine -->
     <main class="canvas" id="app">
+      <!-- Breadcrumb Navigation -->
+      <nav class="breadcrumb-bar" aria-label="Breadcrumb">
+        <ol class="breadcrumb-list">
+          <li><a href="/">Home</a></li>
+          <li><span class="breadcrumb-sep">/</span></li>
+          <li><span class="breadcrumb-current">{{BREADCRUMB_NAME}}</span></li>
+        </ol>
+      </nav>
+
       <header class="monolith-head">
         <a href="/" class="logo-wrap" title="Back to SLURP Homepage">
           <svg class="header-icon" viewBox="0 0 32 32" width="32" height="32" fill="none" aria-hidden="true">
@@ -60,6 +72,7 @@
         <p class="micro-status" id="statusLine">{{HEADER_STATUS}}</p>
       </header>
 
+      <!-- Machine Zone -->
       <section class="machine-zone" aria-label="Media Downloader Input">
         <form id="slurpForm" class="slurp-bar" autocomplete="off">
           <input 
@@ -91,32 +104,38 @@
     <div class="content-container">
       {{PAGE_CONTENT}}
 
+      <!-- Footer with Links to all 12 Programmatic Pages -->
       <footer class="site-footer">
         <div class="footer-top">
           <div class="footer-brand">
             <a href="/" class="footer-logo" style="text-decoration:none; color:inherit;">SLURP</a>
-            <p class="footer-tagline">Minimalist Universal Media Downloader · Built for Speed</p>
+            <p class="footer-tagline">Minimalist Universal Media Downloader · Built for Speed & Precision</p>
           </div>
           <div class="footer-links-group">
-            <span class="footer-heading">Platform Pages</span>
+            <span class="footer-heading">Platform Hub</span>
             <ul class="footer-links">
               <li><a href="/tiktok-slideshow-downloader">TikTok Slideshow ZIP</a></li>
               <li><a href="/tiktok-downloader">TikTok Video No Watermark</a></li>
+              <li><a href="/tiktok-soundtrack-downloader">TikTok Soundtrack MP3</a></li>
               <li><a href="/instagram-reel-downloader">Instagram Reels Downloader</a></li>
               <li><a href="/instagram-carousel-downloader">Instagram Carousel Downloader</a></li>
+              <li><a href="/instagram-story-downloader">Instagram Story Downloader</a></li>
               <li><a href="/youtube-shorts-downloader">YouTube Shorts Downloader</a></li>
+              <li><a href="/youtube-video-downloader">YouTube Video Downloader</a></li>
               <li><a href="/twitter-video-downloader">X / Twitter Video Downloader</a></li>
+              <li><a href="/facebook-reel-downloader">Facebook Reels Downloader</a></li>
               <li><a href="/facebook-video-downloader">Facebook Video Downloader</a></li>
+              <li><a href="/no-watermark-video-downloader">Universal No Watermark</a></li>
             </ul>
           </div>
         </div>
         
         <div class="footer-bottom">
-          <p class="copyright">© 2026 SLURP Media. Free & Open-source.</p>
+          <p class="copyright">© 2026 SLURP Media. Free & Open-source under MIT License.</p>
           <div class="footer-badges">
-            <span class="footer-chip">100% Clean</span>
+            <span class="footer-chip">100% Free</span>
             <span class="footer-chip">0 Ads</span>
-            <span class="footer-chip">Fast CDN</span>
+            <span class="footer-chip">Direct CDN</span>
           </div>
         </div>
       </footer>

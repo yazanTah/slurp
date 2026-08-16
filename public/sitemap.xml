@@ -19,6 +19,12 @@
     <priority>0.90</priority>
   </url>
   <url>
+    <loc>https://slurp.media/tiktok-soundtrack-downloader</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
     <loc>https://slurp.media/instagram-reel-downloader</loc>
     <lastmod>2026-08-16</lastmod>
     <changefreq>weekly</changefreq>
@@ -31,7 +37,19 @@
     <priority>0.90</priority>
   </url>
   <url>
+    <loc>https://slurp.media/instagram-story-downloader</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
     <loc>https://slurp.media/youtube-shorts-downloader</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
+    <loc>https://slurp.media/youtube-video-downloader</loc>
     <lastmod>2026-08-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
@@ -43,7 +61,19 @@
     <priority>0.85</priority>
   </url>
   <url>
+    <loc>https://slurp.media/facebook-reel-downloader</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
     <loc>https://slurp.media/facebook-video-downloader</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://slurp.media/no-watermark-video-downloader</loc>
     <lastmod>2026-08-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>

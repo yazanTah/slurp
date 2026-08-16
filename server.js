@@ -16,6 +16,14 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200, maxFreeSo
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
 const fastAxios = axios.create({ httpsAgent, httpAgent, timeout: 15000 });
 
+// Security & Header Policy Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -382,18 +390,20 @@ app.post('/api/resolve', async (req, res) => {
   }
 });
 
-// --- PROGRAMMATIC SEO LANDING PAGES ---
+// --- 12 PROGRAMMATIC SEO & AEO LANDING PAGES ---
 const SEO_LANDING_PAGES = {
   '/tiktok-slideshow-downloader': {
-    title: 'TikTok Slideshow Downloader (ZIP + Audio) // SLURP',
-    description: 'Download full TikTok photo slideshows and carousels as high-resolution ZIP files with original soundtrack MP3. 100% free, fast, no watermark.',
+    title: 'TikTok Slideshow Downloader (ZIP + Audio) | SLURP',
+    description: 'Download full TikTok photo slideshows and carousels as high-resolution ZIP files with original soundtrack MP3. 100% free, fast, zero watermark.',
     keywords: 'tiktok slideshow downloader, download tiktok photos zip, tiktok carousel downloader, tiktok photo album download',
     canonical: 'https://slurp.media/tiktok-slideshow-downloader',
     status: 'tiktok slideshow to zip · soundtrack mp3 · no watermark',
     placeholder: 'paste tiktok photo slideshow link...',
     badge: 'TIKTOK SLIDESHOWS',
+    breadcrumb: 'TikTok Slideshow Downloader',
     heading: 'TikTok Slideshow to ZIP Downloader',
     subheading: 'Extract all high-resolution slides and soundtrack into a single instant ZIP archive without watermarks.',
+    answer: 'SLURP is an instant media archiver that resolves TikTok photo slideshows and bundles all full-resolution image slides (JPEG/WebP) alongside the original soundtrack (MP3) into a single downloadable ZIP file in under 10ms with zero watermarks.',
     steps: [
       { num: '01', title: 'Copy Slideshow Link', desc: 'Open TikTok, find the photo slideshow post, tap <strong>Share</strong> and copy the link.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the machine bar above or press <code>⌘V</code> anywhere on the page.' },
@@ -405,21 +415,23 @@ const SEO_LANDING_PAGES = {
       { title: 'Zero Watermark & Full HD', desc: 'Preserves original pixel dimensions without any TikTok logo overlays or username watermarks.' }
     ],
     faqs: [
-      { q: 'How do I download all photos from a TikTok slideshow at once?', a: 'Paste the slideshow URL into SLURP. It automatically detects all photo slides and bundles them with the background audio into a single .ZIP archive.' },
+      { q: 'How do I download all photos from a TikTok slideshow at once?', a: 'Paste the slideshow URL into SLURP. It automatically detects all photo slides and bundles them with the background audio into a single .ZIP archive in under 10ms.' },
       { q: 'Can I download TikTok slideshows on iPhone (iOS)?', a: 'Yes! Tap Download on Safari, open the downloaded .ZIP file in the iOS Files app, and tap Uncompress to view all photos in original quality.' },
       { q: 'Is there a limit on how many slides I can download?', a: 'No. SLURP supports slideshows with any number of photos with zero limits.' }
     ]
   },
   '/tiktok-downloader': {
-    title: 'TikTok Video Downloader Without Watermark HD // SLURP',
+    title: 'TikTok Video Downloader Without Watermark HD | SLURP',
     description: 'Download TikTok videos in Full HD MP4 without watermark. Direct high-speed CDN stream, no ads, no sign-up.',
     keywords: 'tiktok video downloader, tiktok no watermark, download tiktok mp4, tiktok hd video download',
     canonical: 'https://slurp.media/tiktok-downloader',
     status: 'tiktok mp4 video · direct cdn stream · no watermark',
     placeholder: 'paste tiktok video link...',
     badge: 'TIKTOK VIDEO',
+    breadcrumb: 'TikTok Video Downloader',
     heading: 'TikTok Video Downloader (No Watermark)',
     subheading: 'Download high-definition TikTok videos without watermark in original source bitrate.',
+    answer: 'SLURP extracts clean, watermark-free TikTok videos directly from origin content delivery network (CDN) servers in full 1080p MP4 format with original high-bitrate audio.',
     steps: [
       { num: '01', title: 'Copy Video Link', desc: 'Open TikTok on app or web, tap <strong>Share</strong> and copy the video URL.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the input bar above. SLURP resolves the clean video stream instantly.' },
@@ -435,16 +447,44 @@ const SEO_LANDING_PAGES = {
       { q: 'Is SLURP free to download TikTok videos?', a: 'Yes, 100% free with unlimited downloads and zero ads.' }
     ]
   },
+  '/tiktok-soundtrack-downloader': {
+    title: 'TikTok MP3 Soundtrack & Audio Downloader | SLURP',
+    description: 'Download original audio and soundtrack MP3 from any TikTok video or photo slideshow in high bitrate 320kbps. 100% free.',
+    keywords: 'tiktok audio downloader, download tiktok mp3, tiktok sound download, extract audio from tiktok',
+    canonical: 'https://slurp.media/tiktok-soundtrack-downloader',
+    status: 'tiktok audio mp3 · 320kbps original bitrate · instant',
+    placeholder: 'paste tiktok link to extract audio...',
+    badge: 'TIKTOK AUDIO',
+    breadcrumb: 'TikTok Soundtrack Downloader',
+    heading: 'TikTok MP3 Soundtrack & Audio Downloader',
+    subheading: 'Extract and download high-quality isolated audio and soundtrack MP3 files from any TikTok post.',
+    answer: 'SLURP isolates and extracts the pure background music and audio track from any TikTok post, delivering a clean 320kbps MP3 sound file directly to your device.',
+    steps: [
+      { num: '01', title: 'Copy Post Link', desc: 'Copy the link of the TikTok containing the soundtrack you want to extract.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the link into SLURP. The engine isolates the soundtrack automatically.' },
+      { num: '03', title: 'Download MP3', desc: 'Click download to save the uncompressed MP3 audio track.' }
+    ],
+    features: [
+      { title: 'Original High-Bitrate Audio', desc: 'Extracts full fidelity audio directly from source media.' },
+      { title: 'Works on Slideshows & Videos', desc: 'Isolates audio from both video posts and photo carousel sound loops.' },
+      { title: 'Instant Processing', desc: 'No queue or slow conversion time.' }
+    ],
+    faqs: [
+      { q: 'Can I extract sound from TikTok slideshows?', a: 'Yes! SLURP extracts the complete soundtrack MP3 from both videos and multi-photo slideshows.' }
+    ]
+  },
   '/instagram-reel-downloader': {
-    title: 'Instagram Reels Downloader (1080p MP4) // SLURP',
+    title: 'Instagram Reels Downloader (1080p MP4) | SLURP',
     description: 'Download Instagram Reels and videos in high-definition MP4. Fast direct streaming with original audio.',
     keywords: 'instagram reel downloader, download ig reels mp4, instagram video download 1080p',
     canonical: 'https://slurp.media/instagram-reel-downloader',
     status: 'instagram reels · 1080p mp4 · original audio',
     placeholder: 'paste instagram reel link...',
     badge: 'INSTAGRAM REELS',
+    breadcrumb: 'Instagram Reels Downloader',
     heading: 'Instagram Reels & Video Downloader',
     subheading: 'Save Instagram Reels, posts, and videos in crystal-clear 1080p MP4 with original audio.',
+    answer: 'SLURP provides direct CDN video stream extraction for Instagram Reels, saving videos in original 1080p MP4 format with full audio clarity and zero watermarks.',
     steps: [
       { num: '01', title: 'Copy Reel Link', desc: 'Open Instagram, tap the three dots or Share icon on any Reel, and copy the link.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the input bar above.' },
@@ -461,15 +501,17 @@ const SEO_LANDING_PAGES = {
     ]
   },
   '/instagram-carousel-downloader': {
-    title: 'Instagram Carousel & Multi-Photo Downloader // SLURP',
+    title: 'Instagram Carousel & Multi-Photo Downloader | SLURP',
     description: 'Download multiple photos and videos from Instagram carousel posts in full original resolution.',
     keywords: 'instagram carousel downloader, download instagram multi photos, instagram slide downloader',
     canonical: 'https://slurp.media/instagram-carousel-downloader',
     status: 'instagram carousels · multi-photo download · hd',
     placeholder: 'paste instagram carousel link...',
     badge: 'INSTAGRAM CAROUSEL',
+    breadcrumb: 'Instagram Carousel Downloader',
     heading: 'Instagram Carousel & Photo Downloader',
     subheading: 'Download multi-slide photo posts and albums in full resolution.',
+    answer: 'SLURP extracts every photo and video slide from multi-item Instagram carousels in a single request, preserving full uncompressed original resolutions.',
     steps: [
       { num: '01', title: 'Copy Carousel Link', desc: 'Copy the URL of any multi-photo Instagram post.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste the link into SLURP to extract all individual images.' },
@@ -484,16 +526,44 @@ const SEO_LANDING_PAGES = {
       { q: 'How many photos can I extract from one Instagram post?', a: 'All photos present in the carousel (up to 10 or 20 items) will be extracted.' }
     ]
   },
+  '/instagram-story-downloader': {
+    title: 'Instagram Story & Highlights Downloader | SLURP',
+    description: 'Download public Instagram Stories and Highlight videos in full HD MP4 quality anonymously. 100% free.',
+    keywords: 'instagram story downloader, download ig story, instagram highlights downloader',
+    canonical: 'https://slurp.media/instagram-story-downloader',
+    status: 'instagram stories & highlights · anonymous · hd mp4',
+    placeholder: 'paste public instagram story link...',
+    badge: 'INSTAGRAM STORIES',
+    breadcrumb: 'Instagram Story Downloader',
+    heading: 'Instagram Story & Highlights Downloader',
+    subheading: 'Download public Instagram Stories and Highlights anonymously in Full HD.',
+    answer: 'SLURP resolves public Instagram Stories and Highlights, streaming the clean MP4 video or high-res photo directly to your browser with full anonymity.',
+    steps: [
+      { num: '01', title: 'Copy Story Link', desc: 'Copy the URL of any public Instagram Story or Highlight.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste into the machine bar above.' },
+      { num: '03', title: 'Save Media', desc: 'Download original quality MP4 or JPEG files.' }
+    ],
+    features: [
+      { title: '100% Anonymous', desc: 'Views and downloads public stories without logging into an Instagram account.' },
+      { title: 'Original 1080p Resolution', desc: 'Saves the uncompressed source stream.' },
+      { title: 'Zero App Installs', desc: 'Works directly in your mobile browser.' }
+    ],
+    faqs: [
+      { q: 'Can I download stories anonymously?', a: 'Yes. SLURP does not require an Instagram login, ensuring your view is completely anonymous.' }
+    ]
+  },
   '/youtube-shorts-downloader': {
-    title: 'YouTube Shorts Downloader (HD MP4) // SLURP',
+    title: 'YouTube Shorts Downloader (HD MP4) | SLURP',
     description: 'Download YouTube Shorts and videos directly in HD MP4 without popups or slow transcoding queues.',
     keywords: 'youtube shorts downloader, download youtube shorts mp4, youtube short video save',
     canonical: 'https://slurp.media/youtube-shorts-downloader',
     status: 'youtube shorts & videos · instant mp4 · zero queue',
     placeholder: 'paste youtube shorts link...',
     badge: 'YOUTUBE SHORTS',
+    breadcrumb: 'YouTube Shorts Downloader',
     heading: 'YouTube Shorts & Video Downloader',
     subheading: 'Download YouTube Shorts and videos in HD MP4 with zero wait time and zero popups.',
+    answer: 'SLURP is a high-speed YouTube Shorts extractor that delivers direct MP4 stream downloads without converter queues, third-party ads, or popups.',
     steps: [
       { num: '01', title: 'Copy Shorts URL', desc: 'Copy the link of any YouTube Short or regular video.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste the link into the machine bar above.' },
@@ -508,16 +578,44 @@ const SEO_LANDING_PAGES = {
       { q: 'How do I download YouTube Shorts on mobile?', a: 'Paste the YouTube Shorts URL into SLURP on Safari (iOS) or Chrome (Android) and tap Download.' }
     ]
   },
+  '/youtube-video-downloader': {
+    title: 'YouTube Video Downloader (1080p MP4) | SLURP',
+    description: 'Download YouTube videos in 1080p Full HD MP4 format. Direct stream connection with zero wait time.',
+    keywords: 'youtube video downloader, download youtube mp4, youtube 1080p downloader, save youtube video',
+    canonical: 'https://slurp.media/youtube-video-downloader',
+    status: 'youtube videos · 1080p full hd · fast stream',
+    placeholder: 'paste youtube video link...',
+    badge: 'YOUTUBE VIDEO',
+    breadcrumb: 'YouTube Video Downloader',
+    heading: 'YouTube Video Downloader (1080p MP4)',
+    subheading: 'Stream and save YouTube videos in Full HD MP4 directly to your device.',
+    answer: 'SLURP extracts raw YouTube video streams in Full HD 1080p MP4 format, bypassing re-encoding lag and delivering instant downloads directly to your device.',
+    steps: [
+      { num: '01', title: 'Copy Video URL', desc: 'Copy the URL of any public YouTube video.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste into the machine input bar.' },
+      { num: '03', title: 'Save .MP4', desc: 'Download Full HD video file.' }
+    ],
+    features: [
+      { title: '1080p Full HD', desc: 'Crisp video streams with original audio tracks.' },
+      { title: 'Direct Streaming', desc: 'Zero queue delays or external converter redirects.' },
+      { title: 'Clean Interface', desc: 'Zero intrusive popups or advertisements.' }
+    ],
+    faqs: [
+      { q: 'Is it free to download YouTube videos on SLURP?', a: 'Yes, SLURP is 100% free with unlimited downloads.' }
+    ]
+  },
   '/twitter-video-downloader': {
-    title: 'X / Twitter Video Downloader (HD MP4) // SLURP',
+    title: 'X / Twitter Video Downloader (HD MP4) | SLURP',
     description: 'Download X (Twitter) videos and GIFs in highest available bitrate. Free, fast, and watermark-free.',
     keywords: 'twitter video downloader, x video downloader, download twitter mp4, save x video',
     canonical: 'https://slurp.media/twitter-video-downloader',
     status: 'x / twitter videos & gifs · highest bitrate hd',
     placeholder: 'paste x / twitter link...',
     badge: 'X / TWITTER',
+    breadcrumb: 'X / Twitter Video Downloader',
     heading: 'X / Twitter Video Downloader',
     subheading: 'Save videos and GIFs from X (Twitter) in highest available bitrate.',
+    answer: 'SLURP connects directly to X (Twitter) video endpoints to fetch the highest available bitrate MP4 video and animated GIF stream without watermarks.',
     steps: [
       { num: '01', title: 'Copy Tweet Link', desc: 'Tap Share on any post containing a video or GIF on X.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste into the machine input bar.' },
@@ -532,18 +630,46 @@ const SEO_LANDING_PAGES = {
       { q: 'Can I download GIFs from Twitter?', a: 'Yes, Twitter GIFs are encoded as MP4 videos and can be downloaded instantly.' }
     ]
   },
+  '/facebook-reel-downloader': {
+    title: 'Facebook Reels Downloader (HD MP4) | SLURP',
+    description: 'Download Facebook Reels short-form videos in High Definition MP4 with original audio. Free & instant.',
+    keywords: 'facebook reels downloader, download fb reels mp4, facebook reel video download',
+    canonical: 'https://slurp.media/facebook-reel-downloader',
+    status: 'facebook reels · 1080p hd mp4 · instant download',
+    placeholder: 'paste facebook reel link...',
+    badge: 'FACEBOOK REELS',
+    breadcrumb: 'Facebook Reels Downloader',
+    heading: 'Facebook Reels Downloader (HD MP4)',
+    subheading: 'Download Facebook Reels in High Definition with original audio quality.',
+    answer: 'SLURP extracts public Facebook Reels in crisp HD MP4 format, ensuring original audio synchronization and zero watermarks.',
+    steps: [
+      { num: '01', title: 'Copy Reel Link', desc: 'Click Share on any Facebook Reel and copy the link.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into SLURP.' },
+      { num: '03', title: 'Download HD Video', desc: 'Instant direct download.' }
+    ],
+    features: [
+      { title: 'HD Quality', desc: 'Fetches the highest resolution Facebook Reel stream.' },
+      { title: 'Fast Direct Pipeline', desc: 'Direct stream avoids slow intermediate server buffering.' },
+      { title: 'Mobile Friendly', desc: 'Saves directly to iOS Camera Roll and Android Downloads.' }
+    ],
+    faqs: [
+      { q: 'Can I download Facebook Reels on iPhone?', a: 'Yes, tap Download in Safari, select the file, tap Share, and choose Save Video.' }
+    ]
+  },
   '/facebook-video-downloader': {
-    title: 'Facebook Video & Reels Downloader // SLURP',
-    description: 'Download Facebook Reels and public videos in HD MP4. Direct CDN streams with zero waiting.',
-    keywords: 'facebook video downloader, facebook reels downloader, download fb video mp4',
+    title: 'Facebook Video Downloader (HD MP4) | SLURP',
+    description: 'Download Facebook Watch and public videos in HD MP4. Direct CDN streams with zero waiting.',
+    keywords: 'facebook video downloader, facebook watch downloader, download fb video mp4',
     canonical: 'https://slurp.media/facebook-video-downloader',
     status: 'facebook reels & watch videos · hd mp4',
     placeholder: 'paste facebook video link...',
     badge: 'FACEBOOK VIDEO',
-    heading: 'Facebook Video & Reels Downloader',
-    subheading: 'Download public Facebook videos and Reels in High Definition.',
+    breadcrumb: 'Facebook Video Downloader',
+    heading: 'Facebook Video Downloader',
+    subheading: 'Download public Facebook videos and Watch clips in High Definition.',
+    answer: 'SLURP extracts public Facebook Watch videos in HD and SD resolutions, offering direct stream MP4 downloads without third-party apps.',
     steps: [
-      { num: '01', title: 'Copy Facebook Link', desc: 'Click Share and copy the public post or Reel link.' },
+      { num: '01', title: 'Copy Facebook Link', desc: 'Click Share and copy the public post or Watch link.' },
       { num: '02', title: 'Paste in SLURP', desc: 'Paste into SLURP input bar.' },
       { num: '03', title: 'Download Video', desc: 'Instant MP4 file download.' }
     ],
@@ -554,6 +680,32 @@ const SEO_LANDING_PAGES = {
     ],
     faqs: [
       { q: 'Can I download private Facebook videos?', a: 'No, only public videos can be extracted.' }
+    ]
+  },
+  '/no-watermark-video-downloader': {
+    title: 'Universal No Watermark Video Downloader | SLURP',
+    description: 'Universal media downloader for TikTok, Instagram, YouTube, Facebook, and X with zero watermarks. Fast, free, and ad-free.',
+    keywords: 'no watermark video downloader, remove video watermark, download video without watermark, clean mp4 downloader',
+    canonical: 'https://slurp.media/no-watermark-video-downloader',
+    status: 'universal downloader · zero watermark · 5 platforms',
+    placeholder: 'paste any video or slideshow link...',
+    badge: 'UNIVERSAL EXTRACTOR',
+    breadcrumb: 'Universal No Watermark Downloader',
+    heading: 'Universal No Watermark Video Downloader',
+    subheading: 'Extract videos and slideshows from TikTok, Instagram, YouTube, Facebook, and X with 100% clean streams.',
+    answer: 'SLURP is a universal media extraction engine that connects directly to origin CDN streams across TikTok, Instagram, YouTube, Facebook, and X to provide clean, unwatermarked HD video and ZIP archives.',
+    steps: [
+      { num: '01', title: 'Copy Any Link', desc: 'Copy a public media link from TikTok, IG, YouTube, FB, or X.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste into the machine bar for instant auto-detection.' },
+      { num: '03', title: 'Download Clean Media', desc: 'Download watermark-free MP4 video or ZIP photo archive.' }
+    ],
+    features: [
+      { title: '5 Major Platforms', desc: 'Universal parser handles TikTok, IG, YouTube, Facebook, and X.' },
+      { title: '0 Watermarks Added', desc: 'Extracts clean original source streams.' },
+      { title: 'Ultra-Fast Zero Queue', desc: 'Direct streaming architecture with high socket parallelism.' }
+    ],
+    faqs: [
+      { q: 'Which platforms does SLURP support?', a: 'SLURP supports TikTok (videos, slideshows, audio), Instagram (Reels, carousels, stories), YouTube (Shorts, videos), Facebook (Reels, Watch), and X / Twitter.' }
     ]
   }
 };
@@ -572,12 +724,31 @@ function generateStructuredData(meta) {
     "@graph": [
       {
         "@type": "WebApplication",
+        "@id": `${meta.canonical}#webapp`,
         "name": meta.title,
         "url": meta.canonical,
         "description": meta.description,
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "All",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": meta.features.map(f => f.title)
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://slurp.media/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": meta.breadcrumb,
+            "item": meta.canonical
+          }
+        ]
       },
       {
         "@type": "HowTo",
@@ -596,6 +767,12 @@ function generateStructuredData(meta) {
           "name": f.q,
           "acceptedAnswer": { "@type": "Answer", "text": f.a }
         }))
+      },
+      {
+        "@type": "Organization",
+        "name": "SLURP Media",
+        "url": "https://slurp.media/",
+        "logo": "https://slurp.media/favicon.svg"
       }
     ]
   };
@@ -639,14 +816,19 @@ function generateLandingContent(meta) {
       <h1 class="section-title">${meta.heading}</h1>
       <p class="section-subtitle">${meta.subheading}</p>
 
+      <div class="geo-answer-box">
+        <span class="geo-answer-label">Quick Summary</span>
+        <p class="geo-answer-text">${meta.answer}</p>
+      </div>
+
       <ol class="steps-grid">
         ${stepsHtml}
       </ol>
     </section>
 
     <section class="seo-section">
-      <div class="section-badge">FEATURES</div>
-      <h2 class="section-title">Engineered for Performance</h2>
+      <div class="section-badge">PERFORMANCE MATRIX</div>
+      <h2 class="section-title">Engineered for Ludicrous Speed</h2>
       <div class="platform-grid">
         ${featuresHtml}
       </div>
@@ -662,6 +844,7 @@ function generateLandingContent(meta) {
   `;
 }
 
+// Bind all 12 programmatic routes
 Object.entries(SEO_LANDING_PAGES).forEach(([routePath, meta]) => {
   app.get(routePath, (req, res) => {
     try {
@@ -676,6 +859,7 @@ Object.entries(SEO_LANDING_PAGES).forEach(([routePath, meta]) => {
         .replace(/{{CANONICAL_URL}}/g, meta.canonical)
         .replace(/{{HEADER_STATUS}}/g, meta.status)
         .replace(/{{INPUT_PLACEHOLDER}}/g, meta.placeholder)
+        .replace(/{{BREADCRUMB_NAME}}/g, meta.breadcrumb)
         .replace('{{STRUCTURED_DATA}}', structuredData)
         .replace('{{PAGE_CONTENT}}', content);
 
