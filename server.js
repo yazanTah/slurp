@@ -272,7 +272,7 @@ async function resolveYouTube(targetUrl) {
       dumpSingleJson: true,
       noCheckCertificates: true,
       noWarnings: true,
-      extractorArgs: 'youtube:player_client=android'
+      extractorArgs: 'youtube:player_client=tv,android'
     });
 
     if (info && info.title) {
@@ -588,7 +588,7 @@ app.get('/api/stream/video', async (req, res) => {
     const subprocess = youtubedl.exec(originUrl, {
       output: '-',
       format: isAudio ? 'bestaudio[ext=m4a]/bestaudio/best' : '18/best[ext=mp4]/best',
-      extractorArgs: 'youtube:player_client=android',
+      extractorArgs: 'youtube:player_client=tv,android',
       noCheckCertificates: true,
       noWarnings: true
     });
@@ -690,12 +690,17 @@ app.get('/api/stream/video', async (req, res) => {
   }
 
   try {
+    // YouTube CDN links are throttled to ~2MB when fetched from datacenter IPs (Render).
+    // Redirect the browser to a fresh direct CDN link instead of proxying, so the
+    // download runs at the client's full speed and server bandwidth stays near zero.
+    if (isYouTube && !targetUrl) {
+      const directUrl = await refreshYouTubeTarget();
+      return res.redirect(302, directUrl);
+    }
     let videoResponse;
     try {
       if (!targetUrl && originUrl) {
-        targetUrl = isYouTube
-          ? await refreshYouTubeTarget()
-          : formatMediaUrl((await resolveUniversalMedia(originUrl))?.videoUrl);
+        targetUrl = formatMediaUrl((await resolveUniversalMedia(originUrl))?.videoUrl);
       }
       videoResponse = await fetchStream(targetUrl);
     } catch (initialErr) {
@@ -704,16 +709,15 @@ app.get('/api/stream/video', async (req, res) => {
         console.warn(`Stream token expired (${initialErr.message}). Re-resolving origin: ${originUrl}`);
         RESOLVE_CACHE.delete(originUrl);
         if (isYouTube) {
-          targetUrl = await refreshYouTubeTarget();
+          const directUrl = await refreshYouTubeTarget();
+          return res.redirect(302, directUrl);
+        }
+        const fresh = await resolveUniversalMedia(originUrl);
+        if (fresh && fresh.videoUrl) {
+          targetUrl = formatMediaUrl(fresh.videoUrl);
           videoResponse = await fetchStream(targetUrl);
         } else {
-          const fresh = await resolveUniversalMedia(originUrl);
-          if (fresh && fresh.videoUrl) {
-            targetUrl = formatMediaUrl(fresh.videoUrl);
-            videoResponse = await fetchStream(targetUrl);
-          } else {
-            throw initialErr;
-          }
+          throw initialErr;
         }
       } else {
         throw initialErr;
