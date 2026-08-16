@@ -38,6 +38,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 function formatMediaUrl(rawPath) {
   if (!rawPath || typeof rawPath !== 'string') return null;
   if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) return rawPath;
+  if (rawPath.startsWith('/api/')) return null; // internal proxy route, not a fetchable CDN path
   return `https://www.tikwm.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
 }
 
@@ -578,33 +579,80 @@ app.get('/api/stream/video', async (req, res) => {
   const utf8Filename = encodeURIComponent(cleanTitle) + `.${ext}`;
   const dispositionType = (inline === '1' || inline === 'true') ? 'inline' : 'attachment';
 
-  // Fast-Path: If YouTube originUrl is present, stream directly via high-speed yt-dlp pipe (handles 2+ hour 4K/1080p without any stalling or 2MB cutoffs)
+  // Fast-Path: If YouTube originUrl is present, stream directly via high-speed yt-dlp pipe (handles 2+ hour 4K/1080p without any stalling or 2MB cutoffs).
+  // Datacenter IPs (e.g. Render) are frequently bot-blocked by YouTube, so yt-dlp can die with zero output.
+  // Headers are only committed once the first byte arrives; otherwise we fall back to the HTTP CDN stream below.
   const isYouTube = platform === 'youtube' || (originUrl && (originUrl.includes('youtube.com') || originUrl.includes('youtu.be')));
   if (isYouTube && originUrl) {
+    const YTDLP_FIRST_BYTE_TIMEOUT_MS = 15000;
+    const subprocess = youtubedl.exec(originUrl, {
+      output: '-',
+      format: isAudio ? 'bestaudio[ext=m4a]/bestaudio/best' : '18/best[ext=mp4]/best',
+      extractorArgs: 'youtube:player_client=android',
+      noCheckCertificates: true,
+      noWarnings: true
+    });
+    // youtube-dl-exec v3 returns a thenable ChildProcess that rejects on non-zero exit
+    // (bot-blocked datacenter IPs, killed subprocesses). Consume the rejection so it
+    // never becomes an unhandledRejection that crashes the server.
+    if (subprocess && typeof subprocess.catch === 'function') subprocess.catch(() => {});
+
+    let stderrTail = '';
+    const headChunks = [];
+    let settled = false;
+    let firstByte;
+    const firstBytePromise = new Promise((resolve, reject) => { firstByte = { resolve, reject }; });
+
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; firstByte.reject(new Error(`yt-dlp produced no data within ${YTDLP_FIRST_BYTE_TIMEOUT_MS}ms`)); }
+    }, YTDLP_FIRST_BYTE_TIMEOUT_MS);
+
+    const onData = (chunk) => {
+      headChunks.push(chunk);
+      if (!settled) { settled = true; clearTimeout(timer); firstByte.resolve(); }
+    };
+    subprocess.stdout.on('data', onData);
+    subprocess.stderr.on('data', d => { stderrTail = (stderrTail + d.toString()).slice(-300); });
+    subprocess.on('close', (code) => {
+      if (!settled) { settled = true; clearTimeout(timer); firstByte.reject(new Error(`yt-dlp exited (code ${code}) before any data${stderrTail ? ': ' + stderrTail : ''}`)); }
+    });
+    subprocess.on('error', (err) => {
+      if (!settled) { settled = true; clearTimeout(timer); firstByte.reject(err); }
+    });
+
     try {
+      await firstBytePromise;
+
       res.setHeader('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
       res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${utf8Filename}`);
-
-      const subprocess = youtubedl.exec(originUrl, {
-        output: '-',
-        format: isAudio ? 'bestaudio[ext=m4a]/bestaudio/best' : '18/best[ext=mp4]/best',
-        extractorArgs: 'youtube:player_client=android',
-        noCheckCertificates: true,
-        noWarnings: true
-      });
 
       req.on('close', () => {
         try { subprocess.kill('SIGKILL'); } catch(e) {}
       });
 
+      subprocess.stdout.removeListener('data', onData);
+      subprocess.stdout.pause();
+      for (const chunk of headChunks) res.write(chunk);
       subprocess.stdout.pipe(res);
       return;
     } catch (err) {
-      console.warn('yt-dlp direct stream error, falling back to HTTP stream:', err.message);
+      try { subprocess.kill('SIGKILL'); } catch(e) {}
+      console.warn('yt-dlp direct stream unavailable, falling back to CDN stream:', err.message);
     }
   }
 
   let targetUrl = url ? formatMediaUrl(url) : null;
+
+  // Direct YouTube CDN stream via btch fallback engine.
+  // resolveUniversalMedia() returns a relative /api/stream proxy path for YouTube, which is not fetchable here.
+  async function refreshYouTubeTarget() {
+    const yt = await btch.youtube(originUrl);
+    if (yt && yt.status) {
+      const direct = isAudio ? (yt.mp3 || yt.mp4) : (yt.mp4 || yt.mp3);
+      if (direct) return direct;
+    }
+    throw new Error('No direct YouTube CDN stream available from fallback engine.');
+  }
 
   async function fetchStream(mediaUrl) {
     const headers = {
@@ -645,10 +693,9 @@ app.get('/api/stream/video', async (req, res) => {
     let videoResponse;
     try {
       if (!targetUrl && originUrl) {
-        const fresh = await resolveUniversalMedia(originUrl);
-        if (fresh && fresh.videoUrl) {
-          targetUrl = formatMediaUrl(fresh.videoUrl);
-        }
+        targetUrl = isYouTube
+          ? await refreshYouTubeTarget()
+          : formatMediaUrl((await resolveUniversalMedia(originUrl))?.videoUrl);
       }
       videoResponse = await fetchStream(targetUrl);
     } catch (initialErr) {
@@ -656,12 +703,17 @@ app.get('/api/stream/video', async (req, res) => {
       if (originUrl && (initialErr.response?.status === 403 || initialErr.response?.status === 404 || initialErr.response?.status === 410 || !targetUrl)) {
         console.warn(`Stream token expired (${initialErr.message}). Re-resolving origin: ${originUrl}`);
         RESOLVE_CACHE.delete(originUrl);
-        const fresh = await resolveUniversalMedia(originUrl);
-        if (fresh && fresh.videoUrl) {
-          targetUrl = formatMediaUrl(fresh.videoUrl);
+        if (isYouTube) {
+          targetUrl = await refreshYouTubeTarget();
           videoResponse = await fetchStream(targetUrl);
         } else {
-          throw initialErr;
+          const fresh = await resolveUniversalMedia(originUrl);
+          if (fresh && fresh.videoUrl) {
+            targetUrl = formatMediaUrl(fresh.videoUrl);
+            videoResponse = await fetchStream(targetUrl);
+          } else {
+            throw initialErr;
+          }
         }
       } else {
         throw initialErr;
