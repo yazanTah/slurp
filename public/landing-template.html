@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070708">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <title>{{PAGE_TITLE}}</title>
+  <meta name="title" content="{{PAGE_TITLE}}">
+  <meta name="description" content="{{PAGE_DESCRIPTION}}">
+  <meta name="keywords" content="{{PAGE_KEYWORDS}}">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="{{CANONICAL_URL}}">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{CANONICAL_URL}}">
+  <meta property="og:title" content="{{PAGE_TITLE}}">
+  <meta property="og:description" content="{{PAGE_DESCRIPTION}}">
+  <meta property="og:image" content="https://slurp.media/og-image.svg">
+  <meta property="og:site_name" content="SLURP">
+
+  <!-- Twitter / X -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="{{CANONICAL_URL}}">
+  <meta property="twitter:title" content="{{PAGE_TITLE}}">
+  <meta property="twitter:description" content="{{PAGE_DESCRIPTION}}">
+  <meta property="twitter:image" content="https://slurp.media/og-image.svg">
+
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <link rel="manifest" href="/site.webmanifest">
+  
+  <link rel="preconnect" href="https://www.tikwm.com" crossorigin>
+  <link rel="dns-prefetch" href="https://www.tikwm.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/style.css">
+
+  {{STRUCTURED_DATA}}
+</head>
+<body>
+  <div class="glow-point" aria-hidden="true"></div>
+
+  <div class="page-wrapper">
+    <!-- Top Downloader Machine -->
+    <main class="canvas" id="app">
+      <header class="monolith-head">
+        <a href="/" class="logo-wrap" title="Back to SLURP Homepage">
+          <svg class="header-icon" viewBox="0 0 32 32" width="32" height="32" fill="none" aria-hidden="true">
+            <path d="M16 4 L16 22 M8 14 L16 24 L24 14 M6 28 L26 28" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="logo">SLURP</div>
+        </a>
+        <p class="micro-status" id="statusLine">{{HEADER_STATUS}}</p>
+      </header>
+
+      <section class="machine-zone" aria-label="Media Downloader Input">
+        <form id="slurpForm" class="slurp-bar" autocomplete="off">
+          <input 
+            type="text" 
+            id="urlInput" 
+            placeholder="{{INPUT_PLACEHOLDER}}" 
+            spellcheck="false" 
+            autocomplete="off" 
+            autofocus 
+            required 
+          />
+          <button type="submit" id="goBtn" aria-label="Slurp">
+            <span id="btnArrow">↓</span>
+          </button>
+        </form>
+
+        <div id="slurpOutput" class="output-surface" style="display: none;" aria-live="polite">
+          <div class="pulse-bar" id="pulseBar"></div>
+          <div class="output-content" id="outputContent"></div>
+        </div>
+
+        <div class="sub-hint">
+          <span>⌘V / Ctrl+V anywhere to auto-slurp</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Specific SEO Landing Content -->
+    <div class="content-container">
+      {{PAGE_CONTENT}}
+
+      <footer class="site-footer">
+        <div class="footer-top">
+          <div class="footer-brand">
+            <a href="/" class="footer-logo" style="text-decoration:none; color:inherit;">SLURP</a>
+            <p class="footer-tagline">Minimalist Universal Media Downloader · Built for Speed</p>
+          </div>
+          <div class="footer-links-group">
+            <span class="footer-heading">Platform Pages</span>
+            <ul class="footer-links">
+              <li><a href="/tiktok-slideshow-downloader">TikTok Slideshow ZIP</a></li>
+              <li><a href="/tiktok-downloader">TikTok Video No Watermark</a></li>
+              <li><a href="/instagram-reel-downloader">Instagram Reels Downloader</a></li>
+              <li><a href="/instagram-carousel-downloader">Instagram Carousel Downloader</a></li>
+              <li><a href="/youtube-shorts-downloader">YouTube Shorts Downloader</a></li>
+              <li><a href="/twitter-video-downloader">X / Twitter Video Downloader</a></li>
+              <li><a href="/facebook-video-downloader">Facebook Video Downloader</a></li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="footer-bottom">
+          <p class="copyright">© 2026 SLURP Media. Free & Open-source.</p>
+          <div class="footer-badges">
+            <span class="footer-chip">100% Clean</span>
+            <span class="footer-chip">0 Ads</span>
+            <span class="footer-chip">Fast CDN</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

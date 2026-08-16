@@ -387,65 +387,302 @@ const SEO_LANDING_PAGES = {
   '/tiktok-slideshow-downloader': {
     title: 'TikTok Slideshow Downloader (ZIP + Audio) // SLURP',
     description: 'Download full TikTok photo slideshows and carousels as high-resolution ZIP files with original soundtrack MP3. 100% free, fast, no watermark.',
-    canonical: 'https://slurp.media/tiktok-slideshow-downloader'
+    keywords: 'tiktok slideshow downloader, download tiktok photos zip, tiktok carousel downloader, tiktok photo album download',
+    canonical: 'https://slurp.media/tiktok-slideshow-downloader',
+    status: 'tiktok slideshow to zip · soundtrack mp3 · no watermark',
+    placeholder: 'paste tiktok photo slideshow link...',
+    badge: 'TIKTOK SLIDESHOWS',
+    heading: 'TikTok Slideshow to ZIP Downloader',
+    subheading: 'Extract all high-resolution slides and soundtrack into a single instant ZIP archive without watermarks.',
+    steps: [
+      { num: '01', title: 'Copy Slideshow Link', desc: 'Open TikTok, find the photo slideshow post, tap <strong>Share</strong> and copy the link.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the machine bar above or press <code>⌘V</code> anywhere on the page.' },
+      { num: '03', title: 'Download .ZIP', desc: 'SLURP packages all full-res photos and original soundtrack into an instant ZIP archive.' }
+    ],
+    features: [
+      { title: '10ms In-Memory ZIP Packaging', desc: 'Zero compression wait time. Packages 20+ HD images directly from CDN streams into one clean archive.' },
+      { title: 'Soundtrack MP3 Extraction', desc: 'Includes the original isolated background music file (soundtrack.mp3) with every slideshow.' },
+      { title: 'Zero Watermark & Full HD', desc: 'Preserves original pixel dimensions without any TikTok logo overlays or username watermarks.' }
+    ],
+    faqs: [
+      { q: 'How do I download all photos from a TikTok slideshow at once?', a: 'Paste the slideshow URL into SLURP. It automatically detects all photo slides and bundles them with the background audio into a single .ZIP archive.' },
+      { q: 'Can I download TikTok slideshows on iPhone (iOS)?', a: 'Yes! Tap Download on Safari, open the downloaded .ZIP file in the iOS Files app, and tap Uncompress to view all photos in original quality.' },
+      { q: 'Is there a limit on how many slides I can download?', a: 'No. SLURP supports slideshows with any number of photos with zero limits.' }
+    ]
   },
   '/tiktok-downloader': {
     title: 'TikTok Video Downloader Without Watermark HD // SLURP',
     description: 'Download TikTok videos in Full HD MP4 without watermark. Direct high-speed CDN stream, no ads, no sign-up.',
-    canonical: 'https://slurp.media/tiktok-downloader'
+    keywords: 'tiktok video downloader, tiktok no watermark, download tiktok mp4, tiktok hd video download',
+    canonical: 'https://slurp.media/tiktok-downloader',
+    status: 'tiktok mp4 video · direct cdn stream · no watermark',
+    placeholder: 'paste tiktok video link...',
+    badge: 'TIKTOK VIDEO',
+    heading: 'TikTok Video Downloader (No Watermark)',
+    subheading: 'Download high-definition TikTok videos without watermark in original source bitrate.',
+    steps: [
+      { num: '01', title: 'Copy Video Link', desc: 'Open TikTok on app or web, tap <strong>Share</strong> and copy the video URL.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the input bar above. SLURP resolves the clean video stream instantly.' },
+      { num: '03', title: 'Save .MP4', desc: 'Click Download to save the clean .MP4 file directly to your camera roll or downloads folder.' }
+    ],
+    features: [
+      { title: '100% Clean / No Watermark', desc: 'Streams raw CDN bitrates without TikTok watermark or logo overlay.' },
+      { title: 'Ultra-Fast Stream Direct', desc: 'Direct streaming eliminates server re-encoding delays.' },
+      { title: 'Universal Device Support', desc: 'Works natively on iPhone Safari, Android Chrome, Mac, and Windows.' }
+    ],
+    faqs: [
+      { q: 'Does SLURP remove watermarks from TikTok videos?', a: 'Yes. SLURP downloads the original unwatermarked source video directly from TikTok CDN servers.' },
+      { q: 'Is SLURP free to download TikTok videos?', a: 'Yes, 100% free with unlimited downloads and zero ads.' }
+    ]
   },
   '/instagram-reel-downloader': {
     title: 'Instagram Reels Downloader (1080p MP4) // SLURP',
     description: 'Download Instagram Reels and videos in high-definition MP4. Fast direct streaming with original audio.',
-    canonical: 'https://slurp.media/instagram-reel-downloader'
+    keywords: 'instagram reel downloader, download ig reels mp4, instagram video download 1080p',
+    canonical: 'https://slurp.media/instagram-reel-downloader',
+    status: 'instagram reels · 1080p mp4 · original audio',
+    placeholder: 'paste instagram reel link...',
+    badge: 'INSTAGRAM REELS',
+    heading: 'Instagram Reels & Video Downloader',
+    subheading: 'Save Instagram Reels, posts, and videos in crystal-clear 1080p MP4 with original audio.',
+    steps: [
+      { num: '01', title: 'Copy Reel Link', desc: 'Open Instagram, tap the three dots or Share icon on any Reel, and copy the link.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the URL into the input bar above.' },
+      { num: '03', title: 'Download MP4', desc: 'Your download starts immediately with original sound and resolution.' }
+    ],
+    features: [
+      { title: 'Full 1080p HD Quality', desc: 'Extracts the highest available bitrate Instagram video stream.' },
+      { title: 'Original Audio Preserved', desc: 'Full stereo soundtrack saved directly inside the .MP4 file.' },
+      { title: 'No Account Required', desc: 'Download public reels without logging into Instagram.' }
+    ],
+    faqs: [
+      { q: 'Can I download Instagram Reels on my phone?', a: 'Yes, SLURP works directly in your mobile browser without installing third-party apps.' },
+      { q: 'Can I download private Instagram posts?', a: 'No, only publicly viewable Instagram Reels and posts can be downloaded.' }
+    ]
   },
   '/instagram-carousel-downloader': {
     title: 'Instagram Carousel & Multi-Photo Downloader // SLURP',
     description: 'Download multiple photos and videos from Instagram carousel posts in full original resolution.',
-    canonical: 'https://slurp.media/instagram-carousel-downloader'
+    keywords: 'instagram carousel downloader, download instagram multi photos, instagram slide downloader',
+    canonical: 'https://slurp.media/instagram-carousel-downloader',
+    status: 'instagram carousels · multi-photo download · hd',
+    placeholder: 'paste instagram carousel link...',
+    badge: 'INSTAGRAM CAROUSEL',
+    heading: 'Instagram Carousel & Photo Downloader',
+    subheading: 'Download multi-slide photo posts and albums in full resolution.',
+    steps: [
+      { num: '01', title: 'Copy Carousel Link', desc: 'Copy the URL of any multi-photo Instagram post.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the link into SLURP to extract all individual images.' },
+      { num: '03', title: 'Download Photos', desc: 'Save all images in original resolution directly to your device.' }
+    ],
+    features: [
+      { title: 'Multi-Image Extraction', desc: 'Grabs all photos in the carousel in one single request.' },
+      { title: 'Original Resolution', desc: 'Downloads full uncompressed images.' },
+      { title: 'Fast & Private', desc: 'No trackers, no data collection.' }
+    ],
+    faqs: [
+      { q: 'How many photos can I extract from one Instagram post?', a: 'All photos present in the carousel (up to 10 or 20 items) will be extracted.' }
+    ]
   },
   '/youtube-shorts-downloader': {
     title: 'YouTube Shorts Downloader (HD MP4) // SLURP',
     description: 'Download YouTube Shorts and videos directly in HD MP4 without popups or slow transcoding queues.',
-    canonical: 'https://slurp.media/youtube-shorts-downloader'
+    keywords: 'youtube shorts downloader, download youtube shorts mp4, youtube short video save',
+    canonical: 'https://slurp.media/youtube-shorts-downloader',
+    status: 'youtube shorts & videos · instant mp4 · zero queue',
+    placeholder: 'paste youtube shorts link...',
+    badge: 'YOUTUBE SHORTS',
+    heading: 'YouTube Shorts & Video Downloader',
+    subheading: 'Download YouTube Shorts and videos in HD MP4 with zero wait time and zero popups.',
+    steps: [
+      { num: '01', title: 'Copy Shorts URL', desc: 'Copy the link of any YouTube Short or regular video.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste the link into the machine bar above.' },
+      { num: '03', title: 'Download MP4', desc: 'Direct streaming begins immediately.' }
+    ],
+    features: [
+      { title: 'Zero Transcoding Delay', desc: 'Streams direct media URLs with no waiting in converter queues.' },
+      { title: 'Clean Vertical Video', desc: 'Maintains original vertical aspect ratio and resolution.' },
+      { title: 'Ad-Free Experience', desc: 'No shady popups, fake download buttons, or malware.' }
+    ],
+    faqs: [
+      { q: 'How do I download YouTube Shorts on mobile?', a: 'Paste the YouTube Shorts URL into SLURP on Safari (iOS) or Chrome (Android) and tap Download.' }
+    ]
   },
   '/twitter-video-downloader': {
     title: 'X / Twitter Video Downloader (HD MP4) // SLURP',
     description: 'Download X (Twitter) videos and GIFs in highest available bitrate. Free, fast, and watermark-free.',
-    canonical: 'https://slurp.media/twitter-video-downloader'
+    keywords: 'twitter video downloader, x video downloader, download twitter mp4, save x video',
+    canonical: 'https://slurp.media/twitter-video-downloader',
+    status: 'x / twitter videos & gifs · highest bitrate hd',
+    placeholder: 'paste x / twitter link...',
+    badge: 'X / TWITTER',
+    heading: 'X / Twitter Video Downloader',
+    subheading: 'Save videos and GIFs from X (Twitter) in highest available bitrate.',
+    steps: [
+      { num: '01', title: 'Copy Tweet Link', desc: 'Tap Share on any post containing a video or GIF on X.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste into the machine input bar.' },
+      { num: '03', title: 'Download HD MP4', desc: 'Saves the video directly in crystal-clear MP4.' }
+    ],
+    features: [
+      { title: 'Highest Bitrate Selection', desc: 'Automatically selects the best HD stream available.' },
+      { title: 'GIF to MP4 Support', desc: 'Converts animated GIFs into smooth standard MP4 files.' },
+      { title: 'Direct CDN Links', desc: 'Zero proxy bottlenecks.' }
+    ],
+    faqs: [
+      { q: 'Can I download GIFs from Twitter?', a: 'Yes, Twitter GIFs are encoded as MP4 videos and can be downloaded instantly.' }
+    ]
   },
   '/facebook-video-downloader': {
     title: 'Facebook Video & Reels Downloader // SLURP',
     description: 'Download Facebook Reels and public videos in HD MP4. Direct CDN streams with zero waiting.',
-    canonical: 'https://slurp.media/facebook-video-downloader'
+    keywords: 'facebook video downloader, facebook reels downloader, download fb video mp4',
+    canonical: 'https://slurp.media/facebook-video-downloader',
+    status: 'facebook reels & watch videos · hd mp4',
+    placeholder: 'paste facebook video link...',
+    badge: 'FACEBOOK VIDEO',
+    heading: 'Facebook Video & Reels Downloader',
+    subheading: 'Download public Facebook videos and Reels in High Definition.',
+    steps: [
+      { num: '01', title: 'Copy Facebook Link', desc: 'Click Share and copy the public post or Reel link.' },
+      { num: '02', title: 'Paste in SLURP', desc: 'Paste into SLURP input bar.' },
+      { num: '03', title: 'Download Video', desc: 'Instant MP4 file download.' }
+    ],
+    features: [
+      { title: 'HD Quality Available', desc: 'Fetches HD video stream whenever available.' },
+      { title: 'Works on Reels & Watch', desc: 'Full support for both short-form Reels and long-form Watch videos.' },
+      { title: '100% Free', desc: 'No login or installation required.' }
+    ],
+    faqs: [
+      { q: 'Can I download private Facebook videos?', a: 'No, only public videos can be extracted.' }
+    ]
   }
 };
 
-let cachedIndexHtml = '';
-function getIndexHtml() {
-  if (!cachedIndexHtml || process.env.NODE_ENV !== 'production') {
-    cachedIndexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+let cachedLandingTemplate = '';
+function getLandingTemplate() {
+  if (!cachedLandingTemplate || process.env.NODE_ENV !== 'production') {
+    cachedLandingTemplate = fs.readFileSync(path.join(__dirname, 'public', 'landing-template.html'), 'utf8');
   }
-  return cachedIndexHtml;
+  return cachedLandingTemplate;
+}
+
+function generateStructuredData(meta) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": meta.title,
+        "url": meta.canonical,
+        "description": meta.description,
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "All",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      },
+      {
+        "@type": "HowTo",
+        "name": `How to Download with SLURP (${meta.badge})`,
+        "description": meta.subheading,
+        "step": meta.steps.map(s => ({
+          "@type": "HowToStep",
+          "name": s.title,
+          "text": s.desc.replace(/<[^>]*>/g, '')
+        }))
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": meta.faqs.map(f => ({
+          "@type": "Question",
+          "name": f.q,
+          "acceptedAnswer": { "@type": "Answer", "text": f.a }
+        }))
+      }
+    ]
+  };
+  return `<script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n</script>`;
+}
+
+function generateLandingContent(meta) {
+  const stepsHtml = meta.steps.map(s => `
+    <li class="step-card">
+      <div class="step-num">${s.num}</div>
+      <h3 class="step-heading">${s.title}</h3>
+      <p class="step-desc">${s.desc}</p>
+    </li>
+  `).join('');
+
+  const featuresHtml = meta.features.map(f => `
+    <div class="platform-card">
+      <div class="platform-card-header">
+        <span class="platform-name">${f.title}</span>
+        <span class="platform-tag">FAST</span>
+      </div>
+      <p class="platform-text">${f.desc}</p>
+    </div>
+  `).join('');
+
+  const faqsHtml = meta.faqs.map((f, i) => `
+    <details name="faq" class="faq-item" ${i === 0 ? 'open' : ''}>
+      <summary class="faq-summary">
+        <span>${f.q}</span>
+        <span class="faq-icon">+</span>
+      </summary>
+      <div class="faq-answer">
+        <p>${f.a}</p>
+      </div>
+    </details>
+  `).join('');
+
+  return `
+    <section class="seo-section">
+      <div class="section-badge">${meta.badge}</div>
+      <h1 class="section-title">${meta.heading}</h1>
+      <p class="section-subtitle">${meta.subheading}</p>
+
+      <ol class="steps-grid">
+        ${stepsHtml}
+      </ol>
+    </section>
+
+    <section class="seo-section">
+      <div class="section-badge">FEATURES</div>
+      <h2 class="section-title">Engineered for Performance</h2>
+      <div class="platform-grid">
+        ${featuresHtml}
+      </div>
+    </section>
+
+    <section class="seo-section">
+      <div class="section-badge">FAQ</div>
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <div class="faq-list">
+        ${faqsHtml}
+      </div>
+    </section>
+  `;
 }
 
 Object.entries(SEO_LANDING_PAGES).forEach(([routePath, meta]) => {
   app.get(routePath, (req, res) => {
     try {
-      let html = getIndexHtml()
-        .replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`)
-        .replace(/<meta name="title" content=".*?">/, `<meta name="title" content="${meta.title}">`)
-        .replace(/<meta name="description" content=".*?">/, `<meta name="description" content="${meta.description}">`)
-        .replace(/<link rel="canonical" href=".*?">/, `<link rel="canonical" href="${meta.canonical}">`)
-        .replace(/<meta property="og:title" content=".*?">/, `<meta property="og:title" content="${meta.title}">`)
-        .replace(/<meta property="og:description" content=".*?">/, `<meta property="og:description" content="${meta.description}">`)
-        .replace(/<meta property="og:url" content=".*?">/, `<meta property="og:url" content="${meta.canonical}">`)
-        .replace(/<meta property="twitter:title" content=".*?">/, `<meta property="twitter:title" content="${meta.title}">`)
-        .replace(/<meta property="twitter:description" content=".*?">/, `<meta property="twitter:description" content="${meta.description}">`)
-        .replace(/<meta property="twitter:url" content=".*?">/, `<meta property="twitter:url" content="${meta.canonical}">`);
+      const template = getLandingTemplate();
+      const content = generateLandingContent(meta);
+      const structuredData = generateStructuredData(meta);
+
+      const html = template
+        .replace(/{{PAGE_TITLE}}/g, meta.title)
+        .replace(/{{PAGE_DESCRIPTION}}/g, meta.description)
+        .replace(/{{PAGE_KEYWORDS}}/g, meta.keywords)
+        .replace(/{{CANONICAL_URL}}/g, meta.canonical)
+        .replace(/{{HEADER_STATUS}}/g, meta.status)
+        .replace(/{{INPUT_PLACEHOLDER}}/g, meta.placeholder)
+        .replace('{{STRUCTURED_DATA}}', structuredData)
+        .replace('{{PAGE_CONTENT}}', content);
+
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch (e) {
+      console.error('Error rendering landing page:', e);
       res.sendFile(path.join(__dirname, 'public', 'index.html'));
     }
   });
