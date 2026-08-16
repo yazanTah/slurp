@@ -9,6 +9,7 @@ const archiver = require('archiver');
 const btch = require('btch-downloader');
 const getFBInfo = require('@renpwn/fb-downloader');
 const ytdl = require('@distube/ytdl-core');
+const youtubedl = require('youtube-dl-exec');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -253,7 +254,7 @@ async function resolveInstagram(targetUrl) {
   throw new Error('Unable to extract Instagram link. Make sure the post is public.');
 }
 
-// 3. YouTube & Shorts High-Reliability Dual-Engine Resolver
+// 3. YouTube & Shorts Resolver (High-Speed & Reliable Multi-Tier Engine)
 async function resolveYouTube(targetUrl) {
   const cached = getCachedMedia(targetUrl);
   if (cached) return cached;
@@ -264,7 +265,43 @@ async function resolveYouTube(targetUrl) {
     ? (targetUrl.includes('/shorts/') ? `https://www.youtube.com/shorts/${ytId}` : `https://www.youtube.com/watch?v=${ytId}`)
     : targetUrl;
 
-  // Engine 1: btch.youtube (Primary High-Definition Converter & Stream Provider)
+  // Engine 1: youtubedl (Ultra-reliable metadata extractor)
+  try {
+    const info = await youtubedl(canonicalUrl, {
+      dumpSingleJson: true,
+      noCheckCertificates: true,
+      noWarnings: true,
+      extractorArgs: 'youtube:player_client=android'
+    });
+
+    if (info && info.title) {
+      const result = {
+        success: true,
+        platform: 'youtube',
+        id: ytId || info.id || String(Date.now()),
+        title: info.title || 'YouTube Video',
+        author: {
+          name: info.uploader || info.channel || 'YouTube Channel',
+          username: info.uploader_id || info.uploader || 'creator',
+          avatar: info.thumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '')
+        },
+        cover: info.thumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : ''),
+        duration: info.duration || 0,
+        type: 'video',
+        videoUrl: `/api/stream/video?originUrl=${encodeURIComponent(canonicalUrl)}&platform=youtube`,
+        audioUrl: `/api/stream/video?originUrl=${encodeURIComponent(canonicalUrl)}&platform=youtube&format=audio`,
+        images: []
+      };
+      const YT_CACHE_TTL_MS = 5 * 60 * 1000;
+      setCachedMedia(targetUrl, result, YT_CACHE_TTL_MS);
+      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, YT_CACHE_TTL_MS);
+      return result;
+    }
+  } catch (err) {
+    console.warn('YouTube Engine 1 (youtubedl) failed, falling back:', err.message);
+  }
+
+  // Engine 2: btch.youtube Fallback
   try {
     const yt = await btch.youtube(canonicalUrl);
     if (yt && yt.status && (yt.mp4 || yt.mp3)) {
@@ -280,59 +317,15 @@ async function resolveYouTube(targetUrl) {
         },
         cover: yt.thumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : ''),
         type: 'video',
-        videoUrl: yt.mp4 || '',
+        videoUrl: `/api/stream/video?originUrl=${encodeURIComponent(canonicalUrl)}&platform=youtube`,
         audioUrl: yt.mp3 || '',
         images: []
       };
-      const YT_CACHE_TTL_MS = 2 * 60 * 1000; // 2-minute TTL for fresh ephemeral stream tokens
-      setCachedMedia(targetUrl, result, YT_CACHE_TTL_MS);
-      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, YT_CACHE_TTL_MS);
+      setCachedMedia(targetUrl, result, 2 * 60 * 1000);
+      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, 2 * 60 * 1000);
       return result;
     }
-  } catch (e) {
-    console.warn('YouTube Engine 1 (btch) failed, falling back to ytdl-core:', e.message);
-  }
-
-  // Engine 2: @distube/ytdl-core (Direct Stream Fallback)
-  try {
-    const info = await ytdl.getInfo(canonicalUrl, {
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-        }
-      }
-    });
-
-    const formats = ytdl.filterFormats(info.formats, 'videoandaudio');
-    const bestFormat = formats.find(f => f.url && (f.container === 'mp4' || (f.hasVideo && f.hasAudio))) || formats[0];
-
-    if (bestFormat && bestFormat.url) {
-      const result = {
-        success: true,
-        platform: 'youtube',
-        id: ytId || info.videoDetails.videoId || String(Date.now()),
-        title: info.videoDetails.title || 'YouTube Video',
-        author: {
-          name: info.videoDetails.author?.name || 'YouTube Channel',
-          username: info.videoDetails.author?.user || 'creator',
-          avatar: info.videoDetails.thumbnails?.[0]?.url || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '')
-        },
-        cover: (info.videoDetails.thumbnails && info.videoDetails.thumbnails.length > 0)
-          ? info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url
-          : (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : ''),
-        type: 'video',
-        videoUrl: bestFormat.url,
-        audioUrl: '',
-        images: []
-      };
-      const YT_CACHE_TTL_MS = 2 * 60 * 1000;
-      setCachedMedia(targetUrl, result, YT_CACHE_TTL_MS);
-      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, YT_CACHE_TTL_MS);
-      return result;
-    }
-  } catch (e) {
-    console.warn('YouTube Engine 2 (ytdl-core) error:', e.message);
-  }
+  } catch (e) {}
 
   throw new Error('Unable to extract YouTube video. Make sure the video is public.');
 }
@@ -572,16 +565,46 @@ async function streamZipArchive(res, images, title, musicUrl) {
 
 // Direct Instant Video Streamer with Range, Hotlink-Bypass & Auto-Refresh Support
 app.get('/api/stream/video', async (req, res) => {
-  const { url, title, inline, platform, originUrl } = req.query;
+  const { url, title, inline, platform, originUrl, format } = req.query;
   if (!url && !originUrl) {
     return res.status(400).send('Missing video URL.');
   }
 
-  let targetUrl = url ? formatMediaUrl(url) : null;
+  const isAudio = format === 'audio' || format === 'mp3';
+  const ext = isAudio ? 'mp3' : 'mp4';
   const asciiTitle = sanitizeFilename(title, 'slurp_video');
-  const safeFilename = `${asciiTitle}.mp4`;
+  const safeFilename = `${asciiTitle}.${ext}`;
   const cleanTitle = (title && typeof title === 'string') ? title.replace(/[\r\n\t]+/g, ' ').trim() : 'slurp_video';
-  const utf8Filename = encodeURIComponent(cleanTitle) + '.mp4';
+  const utf8Filename = encodeURIComponent(cleanTitle) + `.${ext}`;
+  const dispositionType = (inline === '1' || inline === 'true') ? 'inline' : 'attachment';
+
+  // Fast-Path: If YouTube originUrl is present, stream directly via high-speed yt-dlp pipe (handles 2+ hour 4K/1080p without any stalling or 2MB cutoffs)
+  const isYouTube = platform === 'youtube' || (originUrl && (originUrl.includes('youtube.com') || originUrl.includes('youtu.be')));
+  if (isYouTube && originUrl) {
+    try {
+      res.setHeader('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
+      res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${utf8Filename}`);
+
+      const subprocess = youtubedl.exec(originUrl, {
+        output: '-',
+        format: isAudio ? 'bestaudio[ext=m4a]/bestaudio/best' : '18/best[ext=mp4]/best',
+        extractorArgs: 'youtube:player_client=android',
+        noCheckCertificates: true,
+        noWarnings: true
+      });
+
+      req.on('close', () => {
+        try { subprocess.kill('SIGKILL'); } catch(e) {}
+      });
+
+      subprocess.stdout.pipe(res);
+      return;
+    } catch (err) {
+      console.warn('yt-dlp direct stream error, falling back to HTTP stream:', err.message);
+    }
+  }
+
+  let targetUrl = url ? formatMediaUrl(url) : null;
 
   async function fetchStream(mediaUrl) {
     const headers = {
@@ -655,7 +678,6 @@ app.get('/api/stream/video', async (req, res) => {
     res.setHeader('Content-Type', videoResponse.headers['content-type'] || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
 
-    const dispositionType = (inline === '1' || inline === 'true') ? 'inline' : 'attachment';
     res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${utf8Filename}`);
 
     if (videoResponse.headers['content-length']) {

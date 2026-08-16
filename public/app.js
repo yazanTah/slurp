@@ -227,8 +227,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getDownloadUrl(data, originUrl) {
     if (!data.videoUrl) return '';
-    // Route all video downloads through same-origin stream endpoint to guarantee clean auto-download,
-    // custom filename header, and 100% bypass of 403 / CORS hotlinking protection.
+    if (data.videoUrl.startsWith('/api/stream/video')) {
+      const glue = data.videoUrl.includes('?') ? '&' : '?';
+      return `${data.videoUrl}${glue}title=${encodeURIComponent(sanitize(data.title))}`;
+    }
     const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
     return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=${encodeURIComponent(data.platform || 'video')}${originParam}`;
   }
@@ -245,8 +247,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let downloadHtml = '';
 
     if (isVideo) {
-      const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
-      const previewStreamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&inline=1${originParam}`;
+      let previewStreamUrl = '';
+      if (data.videoUrl.startsWith('/api/stream/video')) {
+        const glue = data.videoUrl.includes('?') ? '&' : '?';
+        previewStreamUrl = `${data.videoUrl}${glue}inline=1`;
+      } else {
+        const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
+        previewStreamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&inline=1${originParam}`;
+      }
+
       const posterAttr = data.cover ? `poster="${escapeHtml(data.cover)}"` : '';
       previewHtml = `
         <div class="preview-mini-stage">
@@ -255,7 +264,14 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       let audioHtml = '';
       if (data.audioUrl) {
-        const audioDownloadUrl = `/api/stream/video?url=${encodeURIComponent(data.audioUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=audio${originParam}`;
+        let audioDownloadUrl = '';
+        if (data.audioUrl.startsWith('/api/stream/video')) {
+          const glue = data.audioUrl.includes('?') ? '&' : '?';
+          audioDownloadUrl = `${data.audioUrl}${glue}title=${encodeURIComponent(sanitize(data.title))}`;
+        } else {
+          const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
+          audioDownloadUrl = `/api/stream/video?url=${encodeURIComponent(data.audioUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=audio${originParam}`;
+        }
         audioHtml = `
           <a href="${audioDownloadUrl}" class="btn-slurp-download btn-secondary-audio" download="${filename.replace(/\.mp4$/, '.mp3')}" style="margin-top: 8px; font-size: 0.8rem; opacity: 0.85;">
             ♫ DOWNLOAD .MP3 AUDIO
