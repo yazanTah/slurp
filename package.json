@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "postinstall": "cd vendor/bgutil-pot-server && npm install --omit=dev --no-audit --no-fund || echo 'WARN: bgutil POT server deps failed to install; YouTube PO tokens will be unavailable'"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",

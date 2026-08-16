@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { spawn } = require('child_process');
 const axios = require('axios');
 const archiver = require('archiver');
 const btch = require('btch-downloader');
@@ -13,6 +14,70 @@ const youtubedl = require('youtube-dl-exec');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// --- bgutil POT (Proof-of-Origin) token server for yt-dlp ---
+// YouTube bot-blocks datacenter IPs (e.g. Render) unless requests carry PO tokens.
+// We spawn the vendored bgutil server locally and point yt-dlp's plugin at it.
+const POT_SERVER_DIR = path.join(__dirname, 'vendor', 'bgutil-pot-server');
+const POT_PLUGIN_DIR = path.join(__dirname, 'vendor', 'ytdlp-plugins');
+const POT_PORT = parseInt(process.env.POT_PORT, 10) || 4416;
+let potRestarts = 0;
+
+function startPotServer() {
+  if (!fs.existsSync(path.join(POT_SERVER_DIR, 'build', 'main.js'))) return;
+  try {
+    const child = spawn(process.execPath, ['build/main.js', '-p', String(POT_PORT)], {
+      cwd: POT_SERVER_DIR,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const prefix = '[pot-server]';
+    child.stdout.on('data', d => console.log(prefix, d.toString().trim()));
+    child.stderr.on('data', d => console.error(prefix, d.toString().trim()));
+    child.on('exit', (code) => {
+      console.warn(`${prefix} exited with code ${code}`);
+      // Crash-loop guard: up to 10 restarts, then give up (YouTube degrades to CDN fallbacks)
+      if (potRestarts++ < 10) setTimeout(startPotServer, 5000);
+    });
+  } catch (e) {
+    console.warn('Failed to spawn POT server:', e.message);
+  }
+}
+
+let potReadyPromise = null;
+function ensurePotReady() {
+  if (!potReadyPromise) {
+    potReadyPromise = (async () => {
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        try {
+          const r = await axios.get(`http://127.0.0.1:${POT_PORT}/ping`, { timeout: 2000 });
+          if (r.status === 200) return true;
+        } catch (e) {}
+        await new Promise(res => setTimeout(res, 1000));
+      }
+      console.warn('POT server not ready after 30s; continuing without PO tokens');
+      return false;
+    })();
+  }
+  return potReadyPromise;
+}
+
+// Shared yt-dlp flags: plugin dir, node as JS runtime, PO token provider endpoints
+function ytdlpPotFlags() {
+  return {
+    pluginDirs: [POT_PLUGIN_DIR],
+    jsRuntimes: 'node',
+    noCheckCertificates: true,
+    noWarnings: true,
+    extractorArgs: [
+      `youtubepot-bgutilhttp:base_url=http://127.0.0.1:${POT_PORT}`,
+      `youtubepot-bgutilscript:server_home=${POT_SERVER_DIR}`
+    ]
+  };
+}
+
+startPotServer();
 
 // High-performance Keep-Alive Connection Pool for Massive Parallelism
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200, maxFreeSockets: 50 });
@@ -268,11 +333,10 @@ async function resolveYouTube(targetUrl) {
 
   // Engine 1: youtubedl (Ultra-reliable metadata extractor)
   try {
+    await ensurePotReady();
     const info = await youtubedl(canonicalUrl, {
       dumpSingleJson: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-      extractorArgs: 'youtube:player_client=tv,android'
+      ...ytdlpPotFlags()
     });
 
     if (info && info.title) {
@@ -585,12 +649,11 @@ app.get('/api/stream/video', async (req, res) => {
   const isYouTube = platform === 'youtube' || (originUrl && (originUrl.includes('youtube.com') || originUrl.includes('youtu.be')));
   if (isYouTube && originUrl) {
     const YTDLP_FIRST_BYTE_TIMEOUT_MS = 15000;
+    await ensurePotReady();
     const subprocess = youtubedl.exec(originUrl, {
       output: '-',
       format: isAudio ? 'bestaudio[ext=m4a]/bestaudio/best' : '18/best[ext=mp4]/best',
-      extractorArgs: 'youtube:player_client=tv,android',
-      noCheckCertificates: true,
-      noWarnings: true
+      ...ytdlpPotFlags()
     });
     // youtube-dl-exec v3 returns a thenable ChildProcess that rejects on non-zero exit
     // (bot-blocked datacenter IPs, killed subprocesses). Consume the rejection so it
