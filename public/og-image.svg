@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4ff28" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#070708" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14161b"/>
+      <stop offset="100%" stop-color="#0b0c0e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#070708"/>
+  <circle cx="600" cy="315" r="500" fill="url(#glow)"/>
+
+  <!-- Border Card -->
+  <rect x="60" y="60" width="1080" height="510" rx="24" fill="url(#cardGrad)" stroke="#1e2026" stroke-width="2"/>
+
+  <!-- Logo Icon -->
+  <g transform="translate(120, 140)">
+    <rect width="80" height="80" rx="20" fill="#070708" stroke="#d4ff28" stroke-width="3"/>
+    <path d="M40 18 L40 52 M26 38 L40 54 L54 38 M24 62 L56 62" stroke="#d4ff28" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- Title -->
+  <text x="220" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="64" fill="#ffffff" letter-spacing="-2">SLURP</text>
+  <text x="445" y="195" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="22" fill="#d4ff28" letter-spacing="1">// UNIVERSAL EXTRACTOR</text>
+
+  <!-- Tagline -->
+  <text x="120" y="280" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="38" fill="#f0f2f5" letter-spacing="-1">
+    TikTok Slideshows to ZIP · HD Video Streams · No Watermark
+  </text>
+
+  <!-- Subtitle -->
+  <text x="120" y="340" font-family="monospace" font-weight="400" font-size="20" fill="#717784">
+    Zero ads. Zero wait time. Direct high-speed CDN media extraction.
+  </text>
+
+  <!-- Platform Badges -->
+  <g transform="translate(120, 420)">
+    <!-- TikTok -->
+    <rect x="0" y="0" width="150" height="44" rx="8" fill="#17191e" stroke="#252932"/>
+    <text x="75" y="28" font-family="monospace" font-size="14" font-weight="700" fill="#d4ff28" text-anchor="middle">TIKTOK (ZIP)</text>
+
+    <!-- Instagram -->
+    <rect x="165" y="0" width="165" height="44" rx="8" fill="#17191e" stroke="#252932"/>
+    <text x="247" y="28" font-family="monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">INSTAGRAM REELS</text>
+
+    <!-- YouTube -->
+    <rect x="345" y="0" width="160" height="44" rx="8" fill="#17191e" stroke="#252932"/>
+    <text x="425" y="28" font-family="monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">YOUTUBE SHORTS</text>
+
+    <!-- X / Twitter -->
+    <rect x="520" y="0" width="130" height="44" rx="8" fill="#17191e" stroke="#252932"/>
+    <text x="585" y="28" font-family="monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">X / TWITTER</text>
+
+    <!-- Facebook -->
+    <rect x="665" y="0" width="135" height="44" rx="8" fill="#17191e" stroke="#252932"/>
+    <text x="732" y="28" font-family="monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">FACEBOOK HD</text>
+  </g>
+</svg>

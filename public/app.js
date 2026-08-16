@@ -41,6 +41,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 15);
   });
 
+  // Platform Selectors
+  const platPills = document.querySelectorAll('.plat-pill');
+  platPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      platPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const placeholder = pill.getAttribute('data-placeholder');
+      if (placeholder) {
+        input.placeholder = placeholder;
+      } else {
+        input.placeholder = 'paste tiktok · ig · youtube · fb · x link...';
+      }
+      input.focus();
+    });
+  });
+
+  // Auto-activate pill based on pathname or hash
+  const pathname = window.location.pathname.toLowerCase();
+  if (pathname.includes('tiktok')) {
+    document.querySelector('.plat-pill[data-platform="tiktok"]')?.click();
+  } else if (pathname.includes('instagram')) {
+    document.querySelector('.plat-pill[data-platform="instagram"]')?.click();
+  } else if (pathname.includes('youtube')) {
+    document.querySelector('.plat-pill[data-platform="youtube"]')?.click();
+  } else if (pathname.includes('twitter') || pathname.includes('x-video')) {
+    document.querySelector('.plat-pill[data-platform="x"]')?.click();
+  } else if (pathname.includes('facebook')) {
+    document.querySelector('.plat-pill[data-platform="facebook"]')?.click();
+  }
+
   // Escape key to reset
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') resetUI();

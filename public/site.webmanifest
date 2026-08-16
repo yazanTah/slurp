@@ -1,0 +1,16 @@
+{
+  "name": "SLURP // Universal Media Downloader",
+  "short_name": "SLURP",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070708",
+  "theme_color": "#070708",
+  "description": "Universal minimalist video & slideshow ZIP downloader for TikTok, Instagram, YouTube, Facebook, and X.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

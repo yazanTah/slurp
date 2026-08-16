@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
@@ -379,6 +380,75 @@ app.post('/api/resolve', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: err.message || 'Failed to process media link.' });
   }
+});
+
+// --- PROGRAMMATIC SEO LANDING PAGES ---
+const SEO_LANDING_PAGES = {
+  '/tiktok-slideshow-downloader': {
+    title: 'TikTok Slideshow Downloader (ZIP + Audio) // SLURP',
+    description: 'Download full TikTok photo slideshows and carousels as high-resolution ZIP files with original soundtrack MP3. 100% free, fast, no watermark.',
+    canonical: 'https://slurp.media/tiktok-slideshow-downloader'
+  },
+  '/tiktok-downloader': {
+    title: 'TikTok Video Downloader Without Watermark HD // SLURP',
+    description: 'Download TikTok videos in Full HD MP4 without watermark. Direct high-speed CDN stream, no ads, no sign-up.',
+    canonical: 'https://slurp.media/tiktok-downloader'
+  },
+  '/instagram-reel-downloader': {
+    title: 'Instagram Reels Downloader (1080p MP4) // SLURP',
+    description: 'Download Instagram Reels and videos in high-definition MP4. Fast direct streaming with original audio.',
+    canonical: 'https://slurp.media/instagram-reel-downloader'
+  },
+  '/instagram-carousel-downloader': {
+    title: 'Instagram Carousel & Multi-Photo Downloader // SLURP',
+    description: 'Download multiple photos and videos from Instagram carousel posts in full original resolution.',
+    canonical: 'https://slurp.media/instagram-carousel-downloader'
+  },
+  '/youtube-shorts-downloader': {
+    title: 'YouTube Shorts Downloader (HD MP4) // SLURP',
+    description: 'Download YouTube Shorts and videos directly in HD MP4 without popups or slow transcoding queues.',
+    canonical: 'https://slurp.media/youtube-shorts-downloader'
+  },
+  '/twitter-video-downloader': {
+    title: 'X / Twitter Video Downloader (HD MP4) // SLURP',
+    description: 'Download X (Twitter) videos and GIFs in highest available bitrate. Free, fast, and watermark-free.',
+    canonical: 'https://slurp.media/twitter-video-downloader'
+  },
+  '/facebook-video-downloader': {
+    title: 'Facebook Video & Reels Downloader // SLURP',
+    description: 'Download Facebook Reels and public videos in HD MP4. Direct CDN streams with zero waiting.',
+    canonical: 'https://slurp.media/facebook-video-downloader'
+  }
+};
+
+let cachedIndexHtml = '';
+function getIndexHtml() {
+  if (!cachedIndexHtml || process.env.NODE_ENV !== 'production') {
+    cachedIndexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  }
+  return cachedIndexHtml;
+}
+
+Object.entries(SEO_LANDING_PAGES).forEach(([routePath, meta]) => {
+  app.get(routePath, (req, res) => {
+    try {
+      let html = getIndexHtml()
+        .replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`)
+        .replace(/<meta name="title" content=".*?">/, `<meta name="title" content="${meta.title}">`)
+        .replace(/<meta name="description" content=".*?">/, `<meta name="description" content="${meta.description}">`)
+        .replace(/<link rel="canonical" href=".*?">/, `<link rel="canonical" href="${meta.canonical}">`)
+        .replace(/<meta property="og:title" content=".*?">/, `<meta property="og:title" content="${meta.title}">`)
+        .replace(/<meta property="og:description" content=".*?">/, `<meta property="og:description" content="${meta.description}">`)
+        .replace(/<meta property="og:url" content=".*?">/, `<meta property="og:url" content="${meta.canonical}">`)
+        .replace(/<meta property="twitter:title" content=".*?">/, `<meta property="twitter:title" content="${meta.title}">`)
+        .replace(/<meta property="twitter:description" content=".*?">/, `<meta property="twitter:description" content="${meta.description}">`)
+        .replace(/<meta property="twitter:url" content=".*?">/, `<meta property="twitter:url" content="${meta.canonical}">`);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (e) {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+  });
 });
 
 // Health check endpoint
