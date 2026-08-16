@@ -138,13 +138,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return `https://www.instagram.com/${type}/${igMatch[1]}/`;
     }
 
-    // 4. YouTube: normalize Shorts & Watch links
-    const ytShorts = url.match(/(?:youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]+)/i);
-    if (ytShorts && ytShorts[1]) {
+    // 4. YouTube: normalize all Shorts, Watch, Mobile, and Share links
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:shorts\/|watch\?(?:.*&)?v=|embed\/|v\/|live\/))([A-Za-z0-9_-]{11})/i);
+    if (ytMatch && ytMatch[1]) {
+      const ytId = ytMatch[1];
       if (url.includes('/shorts/')) {
-        return `https://www.youtube.com/shorts/${ytShorts[1]}`;
+        return `https://www.youtube.com/shorts/${ytId}`;
       }
-      return `https://youtu.be/${ytShorts[1]}`;
+      return `https://www.youtube.com/watch?v=${ytId}`;
     }
 
     return url;
@@ -210,12 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await resolveMedia(rawUrl);
 
       // Instant direct stream trigger
-      triggerInstantDownload(data);
+      triggerInstantDownload(data, rawUrl);
 
       setLoading(false);
       const platLabel = (data.platform || 'media').toUpperCase();
       statusLine.textContent = data.type === 'video' ? `${platLabel} video slurped` : `${platLabel} carousel slurped (${data.images.length} photos)`;
-      renderOutput(data);
+      renderOutput(data, rawUrl);
 
     } catch (err) {
       setLoading(false);
@@ -224,35 +225,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function getDownloadUrl(data) {
+  function getDownloadUrl(data, originUrl) {
     if (!data.videoUrl) return '';
     // Route all video downloads through same-origin stream endpoint to guarantee clean auto-download,
     // custom filename header, and 100% bypass of 403 / CORS hotlinking protection.
-    return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=${encodeURIComponent(data.platform || 'video')}`;
+    const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
+    return `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=${encodeURIComponent(data.platform || 'video')}${originParam}`;
   }
 
-  function renderOutput(data) {
+  function renderOutput(data, originUrl) {
     outputSection.style.display = 'block';
     const isVideo = data.type === 'video';
     const title = data.title || 'Media';
     const filename = `${sanitize(title)}.mp4`;
     const platform = (data.platform || 'media').toUpperCase();
-    const downloadUrl = getDownloadUrl(data);
+    const downloadUrl = getDownloadUrl(data, originUrl);
 
     let previewHtml = '';
     let downloadHtml = '';
 
     if (isVideo) {
-      const previewStreamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&inline=1`;
+      const originParam = originUrl ? `&originUrl=${encodeURIComponent(originUrl)}` : '';
+      const previewStreamUrl = `/api/stream/video?url=${encodeURIComponent(data.videoUrl)}&inline=1${originParam}`;
+      const posterAttr = data.cover ? `poster="${escapeHtml(data.cover)}"` : '';
       previewHtml = `
         <div class="preview-mini-stage">
-          <video src="${previewStreamUrl}" controls playsinline autoplay muted referrerpolicy="no-referrer"></video>
+          <video src="${previewStreamUrl}" controls playsinline preload="metadata" ${posterAttr} referrerpolicy="no-referrer"></video>
         </div>
       `;
+      let audioHtml = '';
+      if (data.audioUrl) {
+        const audioDownloadUrl = `/api/stream/video?url=${encodeURIComponent(data.audioUrl)}&title=${encodeURIComponent(sanitize(data.title))}&platform=audio${originParam}`;
+        audioHtml = `
+          <a href="${audioDownloadUrl}" class="btn-slurp-download btn-secondary-audio" download="${filename.replace(/\.mp4$/, '.mp3')}" style="margin-top: 8px; font-size: 0.8rem; opacity: 0.85;">
+            ♫ DOWNLOAD .MP3 AUDIO
+          </a>
+        `;
+      }
       downloadHtml = `
         <a href="${downloadUrl}" class="btn-slurp-download" download="${filename}">
           ↓ DOWNLOAD .MP4 [${platform}]
         </a>
+        ${audioHtml}
       `;
     } else {
       const thumbs = data.images.map(img => `<img src="${img}" alt="Slide" loading="lazy" referrerpolicy="no-referrer" />`).join('');
@@ -306,10 +320,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Instant Streaming Download Trigger
-  function triggerInstantDownload(data) {
+  function triggerInstantDownload(data, originUrl) {
     if (data.type === 'video' && data.videoUrl) {
       const filename = `${sanitize(data.title)}.mp4`;
-      const downloadUrl = getDownloadUrl(data);
+      const downloadUrl = getDownloadUrl(data, originUrl);
       
       const a = document.createElement('a');
       a.href = downloadUrl;

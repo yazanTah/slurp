@@ -8,6 +8,7 @@ const axios = require('axios');
 const archiver = require('archiver');
 const btch = require('btch-downloader');
 const getFBInfo = require('@renpwn/fb-downloader');
+const ytdl = require('@distube/ytdl-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -96,13 +97,14 @@ function cleanMediaUrl(input) {
     return `https://www.instagram.com/${type}/${igMatch[1]}/`;
   }
 
-  // 4. YouTube: normalize Shorts & Watch links
-  const ytShorts = url.match(/(?:youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]+)/i);
-  if (ytShorts && ytShorts[1]) {
+  // 4. YouTube: normalize all Shorts, Watch, Mobile, and Share links
+  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:shorts\/|watch\?(?:.*&)?v=|embed\/|v\/|live\/))([A-Za-z0-9_-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    const ytId = ytMatch[1];
     if (url.includes('/shorts/')) {
-      return `https://www.youtube.com/shorts/${ytShorts[1]}`;
+      return `https://www.youtube.com/shorts/${ytId}`;
     }
-    return `https://youtu.be/${ytShorts[1]}`;
+    return `https://www.youtube.com/watch?v=${ytId}`;
   }
 
   return url;
@@ -122,13 +124,13 @@ function getCachedMedia(key) {
   return item.data;
 }
 
-function setCachedMedia(key, data) {
+function setCachedMedia(key, data, customTtl = CACHE_TTL_MS) {
   // Prevent unbounded memory growth (max 1000 entries)
   if (RESOLVE_CACHE.size > 1000) {
     const oldestKey = RESOLVE_CACHE.keys().next().value;
     if (oldestKey) RESOLVE_CACHE.delete(oldestKey);
   }
-  RESOLVE_CACHE.set(key, { data, expiry: Date.now() + CACHE_TTL_MS });
+  RESOLVE_CACHE.set(key, { data, expiry: Date.now() + customTtl });
 }
 
 // --- FAST RESOLVERS ---
@@ -251,34 +253,86 @@ async function resolveInstagram(targetUrl) {
   throw new Error('Unable to extract Instagram link. Make sure the post is public.');
 }
 
-// 3. YouTube & Shorts Resolver
+// 3. YouTube & Shorts High-Reliability Dual-Engine Resolver
 async function resolveYouTube(targetUrl) {
   const cached = getCachedMedia(targetUrl);
   if (cached) return cached;
 
+  const ytMatch = targetUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:shorts\/|watch\?(?:.*&)?v=|embed\/|v\/|live\/))([A-Za-z0-9_-]{11})/i);
+  const ytId = ytMatch ? ytMatch[1] : null;
+  const canonicalUrl = ytId
+    ? (targetUrl.includes('/shorts/') ? `https://www.youtube.com/shorts/${ytId}` : `https://www.youtube.com/watch?v=${ytId}`)
+    : targetUrl;
+
+  // Engine 1: btch.youtube (Primary High-Definition Converter & Stream Provider)
   try {
-    const yt = await btch.youtube(targetUrl);
-    if (yt && yt.status && yt.mp4) {
+    const yt = await btch.youtube(canonicalUrl);
+    if (yt && yt.status && (yt.mp4 || yt.mp3)) {
       const result = {
         success: true,
         platform: 'youtube',
-        id: String(Date.now()),
+        id: ytId || String(Date.now()),
         title: yt.title || 'YouTube Video',
         author: {
           name: yt.author || 'YouTube Channel',
           username: yt.author || 'creator',
-          avatar: yt.thumbnail || ''
+          avatar: yt.thumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '')
         },
-        cover: yt.thumbnail || '',
+        cover: yt.thumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : ''),
         type: 'video',
-        videoUrl: yt.mp4,
+        videoUrl: yt.mp4 || '',
         audioUrl: yt.mp3 || '',
         images: []
       };
-      setCachedMedia(targetUrl, result);
+      const YT_CACHE_TTL_MS = 2 * 60 * 1000; // 2-minute TTL for fresh ephemeral stream tokens
+      setCachedMedia(targetUrl, result, YT_CACHE_TTL_MS);
+      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, YT_CACHE_TTL_MS);
       return result;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('YouTube Engine 1 (btch) failed, falling back to ytdl-core:', e.message);
+  }
+
+  // Engine 2: @distube/ytdl-core (Direct Stream Fallback)
+  try {
+    const info = await ytdl.getInfo(canonicalUrl, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      }
+    });
+
+    const formats = ytdl.filterFormats(info.formats, 'videoandaudio');
+    const bestFormat = formats.find(f => f.url && (f.container === 'mp4' || (f.hasVideo && f.hasAudio))) || formats[0];
+
+    if (bestFormat && bestFormat.url) {
+      const result = {
+        success: true,
+        platform: 'youtube',
+        id: ytId || info.videoDetails.videoId || String(Date.now()),
+        title: info.videoDetails.title || 'YouTube Video',
+        author: {
+          name: info.videoDetails.author?.name || 'YouTube Channel',
+          username: info.videoDetails.author?.user || 'creator',
+          avatar: info.videoDetails.thumbnails?.[0]?.url || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '')
+        },
+        cover: (info.videoDetails.thumbnails && info.videoDetails.thumbnails.length > 0)
+          ? info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url
+          : (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : ''),
+        type: 'video',
+        videoUrl: bestFormat.url,
+        audioUrl: '',
+        images: []
+      };
+      const YT_CACHE_TTL_MS = 2 * 60 * 1000;
+      setCachedMedia(targetUrl, result, YT_CACHE_TTL_MS);
+      if (canonicalUrl !== targetUrl) setCachedMedia(canonicalUrl, result, YT_CACHE_TTL_MS);
+      return result;
+    }
+  } catch (e) {
+    console.warn('YouTube Engine 2 (ytdl-core) error:', e.message);
+  }
 
   throw new Error('Unable to extract YouTube video. Make sure the video is public.');
 }
@@ -516,57 +570,93 @@ async function streamZipArchive(res, images, title, musicUrl) {
   }
 }
 
-// Direct Instant Video Streamer with Range & Hotlink-Bypass Support
+// Direct Instant Video Streamer with Range, Hotlink-Bypass & Auto-Refresh Support
 app.get('/api/stream/video', async (req, res) => {
-  const { url, title, inline } = req.query;
-  if (!url) {
+  const { url, title, inline, platform, originUrl } = req.query;
+  if (!url && !originUrl) {
     return res.status(400).send('Missing video URL.');
   }
 
-  const safeFilename = `${sanitizeFilename(title, 'slurp_video')}.mp4`;
-  const targetUrl = formatMediaUrl(url);
+  let targetUrl = url ? formatMediaUrl(url) : null;
+  const asciiTitle = sanitizeFilename(title, 'slurp_video');
+  const safeFilename = `${asciiTitle}.mp4`;
+  const cleanTitle = (title && typeof title === 'string') ? title.replace(/[\r\n\t]+/g, ' ').trim() : 'slurp_video';
+  const utf8Filename = encodeURIComponent(cleanTitle) + '.mp4';
 
-  try {
+  async function fetchStream(mediaUrl) {
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': '*/*'
     };
 
     // Set origin/referer headers to bypass hotlinking 403 blocks
-    if (targetUrl.includes('twimg.com') || targetUrl.includes('twitter.com') || targetUrl.includes('x.com')) {
+    if (mediaUrl.includes('twimg.com') || mediaUrl.includes('twitter.com') || mediaUrl.includes('x.com')) {
       headers['Referer'] = 'https://twitter.com/';
       headers['Origin'] = 'https://twitter.com';
-    } else if (targetUrl.includes('tikwm') || targetUrl.includes('tiktokcdn')) {
+    } else if (mediaUrl.includes('tikwm') || mediaUrl.includes('tiktokcdn')) {
       headers['Referer'] = 'https://www.tikwm.com/';
-    } else if (targetUrl.includes('instagram.com') || targetUrl.includes('cdninstagram.com')) {
+    } else if (mediaUrl.includes('instagram.com') || mediaUrl.includes('cdninstagram.com')) {
       headers['Referer'] = 'https://www.instagram.com/';
-    } else if (targetUrl.includes('facebook.com') || targetUrl.includes('fbcdn.net')) {
+    } else if (mediaUrl.includes('facebook.com') || mediaUrl.includes('fbcdn.net')) {
       headers['Referer'] = 'https://www.facebook.com/';
+    } else if (mediaUrl.includes('googlevideo.com') || mediaUrl.includes('youtube.com')) {
+      headers['Referer'] = 'https://www.youtube.com/';
+      headers['Origin'] = 'https://www.youtube.com';
     }
 
-    // Forward range header for video player instant seeking & streaming
     if (req.headers.range) {
       headers['Range'] = req.headers.range;
     }
 
-    const videoResponse = await axios({
+    return await axios({
       method: 'GET',
-      url: targetUrl,
+      url: mediaUrl,
       responseType: 'stream',
       headers,
       timeout: 45000,
       validateStatus: (status) => status >= 200 && status < 400,
+    });
+  }
+
+  try {
+    let videoResponse;
+    try {
+      if (!targetUrl && originUrl) {
+        const fresh = await resolveUniversalMedia(originUrl);
+        if (fresh && fresh.videoUrl) {
+          targetUrl = formatMediaUrl(fresh.videoUrl);
+        }
+      }
+      videoResponse = await fetchStream(targetUrl);
+    } catch (initialErr) {
+      // If stream link expired or blocked (403/404/410) and originUrl is present, re-resolve fresh media stream
+      if (originUrl && (initialErr.response?.status === 403 || initialErr.response?.status === 404 || initialErr.response?.status === 410 || !targetUrl)) {
+        console.warn(`Stream token expired (${initialErr.message}). Re-resolving origin: ${originUrl}`);
+        RESOLVE_CACHE.delete(originUrl);
+        const fresh = await resolveUniversalMedia(originUrl);
+        if (fresh && fresh.videoUrl) {
+          targetUrl = formatMediaUrl(fresh.videoUrl);
+          videoResponse = await fetchStream(targetUrl);
+        } else {
+          throw initialErr;
+        }
+      } else {
+        throw initialErr;
+      }
+    }
+
+    req.on('close', () => {
+      if (videoResponse && videoResponse.data && !videoResponse.data.destroyed) {
+        videoResponse.data.destroy();
+      }
     });
 
     res.status(videoResponse.status);
     res.setHeader('Content-Type', videoResponse.headers['content-type'] || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
 
-    if (inline === '1' || inline === 'true') {
-      res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
-    } else {
-      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
-    }
+    const dispositionType = (inline === '1' || inline === 'true') ? 'inline' : 'attachment';
+    res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${utf8Filename}`);
 
     if (videoResponse.headers['content-length']) {
       res.setHeader('Content-Length', videoResponse.headers['content-length']);
