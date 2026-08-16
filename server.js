@@ -718,15 +718,23 @@ function getLandingTemplate() {
   return cachedLandingTemplate;
 }
 
-function generateStructuredData(meta) {
+function getBaseUrl(req) {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.get('host') || `localhost:${PORT}`;
+  return `${protocol}://${host}`;
+}
+
+function generateStructuredData(meta, canonicalUrl, baseUrl) {
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "WebApplication",
-        "@id": `${meta.canonical}#webapp`,
+        "@id": `${canonicalUrl}#webapp`,
         "name": meta.title,
-        "url": meta.canonical,
+        "url": canonicalUrl,
         "description": meta.description,
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "All",
@@ -740,13 +748,13 @@ function generateStructuredData(meta) {
             "@type": "ListItem",
             "position": 1,
             "name": "Home",
-            "item": "https://slurp.media/"
+            "item": `${baseUrl}/`
           },
           {
             "@type": "ListItem",
             "position": 2,
             "name": meta.breadcrumb,
-            "item": meta.canonical
+            "item": canonicalUrl
           }
         ]
       },
@@ -771,8 +779,8 @@ function generateStructuredData(meta) {
       {
         "@type": "Organization",
         "name": "SLURP Media",
-        "url": "https://slurp.media/",
-        "logo": "https://slurp.media/favicon.svg"
+        "url": `${baseUrl}/`,
+        "logo": `${baseUrl}/favicon.svg`
       }
     ]
   };
@@ -844,19 +852,80 @@ function generateLandingContent(meta) {
   `;
 }
 
+// Dynamic Sitemap endpoint
+app.get('/sitemap.xml', (req, res) => {
+  const base = getBaseUrl(req);
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${base}/</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+${Object.keys(SEO_LANDING_PAGES).map(r => `  <url>
+    <loc>${base}${r}</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>`).join('\n')}
+</urlset>`;
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.send(xml);
+});
+
+// Dynamic Robots.txt endpoint
+app.get('/robots.txt', (req, res) => {
+  const base = getBaseUrl(req);
+  const txt = `User-agent: *
+Allow: /
+Disallow: /api/
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: ${base}/sitemap.xml
+`;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send(txt);
+});
+
 // Bind all 12 programmatic routes
 Object.entries(SEO_LANDING_PAGES).forEach(([routePath, meta]) => {
   app.get(routePath, (req, res) => {
     try {
       const template = getLandingTemplate();
+      const baseUrl = getBaseUrl(req);
+      const canonicalUrl = `${baseUrl}${routePath}`;
       const content = generateLandingContent(meta);
-      const structuredData = generateStructuredData(meta);
+      const structuredData = generateStructuredData(meta, canonicalUrl, baseUrl);
 
       const html = template
         .replace(/{{PAGE_TITLE}}/g, meta.title)
         .replace(/{{PAGE_DESCRIPTION}}/g, meta.description)
         .replace(/{{PAGE_KEYWORDS}}/g, meta.keywords)
-        .replace(/{{CANONICAL_URL}}/g, meta.canonical)
+        .replace(/{{CANONICAL_URL}}/g, canonicalUrl)
         .replace(/{{HEADER_STATUS}}/g, meta.status)
         .replace(/{{INPUT_PLACEHOLDER}}/g, meta.placeholder)
         .replace(/{{BREADCRUMB_NAME}}/g, meta.breadcrumb)
